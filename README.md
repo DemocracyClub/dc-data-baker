@@ -24,6 +24,18 @@ uv pip sync requirements/dev.txt
 pre-commit install
 ```
 
+### Javascript dependencies
+
+We're using CDK so you need the cdk tooling.
+
+Probably best to use `nvm` to manage `npm` to manage installing libraries.
+
+Then
+```shell
+nvm use --lts
+npm install
+```
+
 ## Managing dependencies
 
 ### `uv` equivalence
@@ -55,3 +67,14 @@ pre-commit install
 #### dev dependencies
 * Add a dependency to `requirements/dev.in`
 * Run `uv pip compile --generate-hashes --output-file requirements/dev.txt requirements/base.in requirements/dev.in`
+
+
+## CDK Setup
+
+```shell
+AWS_PROFILE=dev-aggregatorapi-dc DC_ENVIRONMENT=development cdk bootstrap
+```
+
+```shell
+AWS_PROFILE=dev-aggregatorapi-dc DC_ENVIRONMENT=development cdk synth
+```

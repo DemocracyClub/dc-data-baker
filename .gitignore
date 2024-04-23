@@ -4,3 +4,8 @@
 # Editor
 .idea
 
+# Node
+node_modules
+
+# CDK
+cdk.out
