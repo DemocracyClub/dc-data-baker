@@ -14,8 +14,8 @@ Use [`uv`](https://github.com/astral-sh/uv) or [`pip-tools`](https://github.com/
 Commands given using `uv`. See [`uv` equivalence]() for comparison.
 
 ```shell
-uv venv --prompt . .venv
-uv pip sync requirements/dev.txt
+PYENV_VERSION=3.10.14 uv venv --prompt . .venv
+uv pip sync requirements/base.txt requirements/dev.txt
 ```
 
 ### Commit hooks
@@ -66,7 +66,7 @@ npm install
 
 #### dev dependencies
 * Add a dependency to `requirements/dev.in`
-* Run `uv pip compile --generate-hashes --output-file requirements/dev.txt requirements/base.in requirements/dev.in`
+* Run `uv pip compile --generate-hashes --output-file requirements/dev.txt requirements/dev.in`
 
 
 ## CDK Setup

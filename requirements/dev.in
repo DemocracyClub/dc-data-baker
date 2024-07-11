@@ -1,2 +1,5 @@
+-c base.txt
+
+ipython
 ruff
 pre-commit

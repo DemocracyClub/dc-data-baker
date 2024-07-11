@@ -21,10 +21,15 @@ aws-cdk-asset-node-proxy-agent-v6==2.0.3 \
 aws-cdk-aws-glue-alpha==2.138.0a0 \
     --hash=sha256:505bd0bda04c061f390dcd1c75a28fc827e784e9a83ed7c9337015c034b37b59 \
     --hash=sha256:58c3b4f467554334acd635a37bc8562e448ce8bdaa9f0879d5b0a547f4fe1e9e
+aws-cdk-aws-lambda-python-alpha==2.138.0a0 \
+    --hash=sha256:70626e0a3ac992dd44111b4f99584e2fec7d71c7d7c270ab20c85a27c42afcd1 \
+    --hash=sha256:7f76bb9eafb7286d10dcf3876814a4cb10abc856e14710740af680f9f8128bbf
 aws-cdk-lib==2.138.0 \
     --hash=sha256:a3f69d1ea22271db4a89a28f3ccf6995c6591586aee0447766933488662a36d1 \
     --hash=sha256:b528fe909dc0e8686f086369fe38bde6f448efbe9519dc56aef3be35d3da75f7
-    # via aws-cdk-aws-glue-alpha
+    # via
+    #   aws-cdk-aws-glue-alpha
+    #   aws-cdk-aws-lambda-python-alpha
 cattrs==23.2.3 \
     --hash=sha256:0341994d94971052e9ee70662542699a3162ea1e0c62f7ce1b4a57f563685108 \
     --hash=sha256:a934090d95abaa9e911dac357e3a8699e0b4b14f8529bcc7d2b1ad9d51672b9f
@@ -34,7 +39,12 @@ constructs==10.3.0 \
     --hash=sha256:518551135ec236f9cc6b86500f4fbbe83b803ccdc6c2cb7684e0b7c4d234e7b1
     # via
     #   aws-cdk-aws-glue-alpha
+    #   aws-cdk-aws-lambda-python-alpha
     #   aws-cdk-lib
+exceptiongroup==1.2.1 \
+    --hash=sha256:5258b9ed329c5bbdd31a309f53cbfb0b155341807f6ff7606a1e801a891b29ad \
+    --hash=sha256:a4785e48b045528f5bfe627b6ad554ff32def154f42372786903b7abcfe1aa16
+    # via cattrs
 importlib-resources==6.4.0 \
     --hash=sha256:50d10f043df931902d4194ea07ec57960f66a80449ff867bfe782b4c486ba78c \
     --hash=sha256:cdb2b453b8046ca4e3798eb1d84f3cce1446a0e8e7b5ef4efb600f19fc398145
@@ -47,6 +57,7 @@ jsii==1.97.0 \
     #   aws-cdk-asset-kubectl-v20
     #   aws-cdk-asset-node-proxy-agent-v6
     #   aws-cdk-aws-glue-alpha
+    #   aws-cdk-aws-lambda-python-alpha
     #   aws-cdk-lib
     #   constructs
 publication==0.0.3 \
@@ -57,6 +68,7 @@ publication==0.0.3 \
     #   aws-cdk-asset-kubectl-v20
     #   aws-cdk-asset-node-proxy-agent-v6
     #   aws-cdk-aws-glue-alpha
+    #   aws-cdk-aws-lambda-python-alpha
     #   aws-cdk-lib
     #   constructs
     #   jsii
@@ -76,10 +88,13 @@ typeguard==2.13.3 \
     #   aws-cdk-asset-kubectl-v20
     #   aws-cdk-asset-node-proxy-agent-v6
     #   aws-cdk-aws-glue-alpha
+    #   aws-cdk-aws-lambda-python-alpha
     #   aws-cdk-lib
     #   constructs
     #   jsii
 typing-extensions==4.11.0 \
     --hash=sha256:83f085bd5ca59c80295fc2a82ab5dac679cbe02b9f33f7d83af68e241bea51b0 \
     --hash=sha256:c1f94d72897edaf4ce775bb7558d5b79d8126906a14ea5ed1635921406c0387a
-    # via jsii
+    # via
+    #   cattrs
+    #   jsii
