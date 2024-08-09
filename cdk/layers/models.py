@@ -29,3 +29,4 @@ class BaseTable:
     data_format: type(glue.DataFormat)
     columns: dict[str: glue.Schema]
     partition_keys: list[glue.Column] = None
+    depends_on: list = None

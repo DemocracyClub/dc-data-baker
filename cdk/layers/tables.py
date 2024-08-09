@@ -40,6 +40,7 @@ addressbase_partitioned = BaseTable(
             type=glue.Schema.STRING,
         )
     ],
+    depends_on=[addressbase_cleaned_raw]
 )
 
 TABLES = [
