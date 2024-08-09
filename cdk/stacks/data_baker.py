@@ -1,8 +1,9 @@
 import aws_cdk.aws_glue_alpha as glue
 import aws_cdk.aws_s3 as s3
 from aws_cdk import Stack
+from aws_cdk import aws_athena as athena
 from constructs import Construct
-from layers.buckets import BUCKETS
+from layers.buckets import BUCKETS, data_baker_results_bucket
 from layers.databases import DATABASES
 from layers.tables import TABLES
 
@@ -20,7 +21,25 @@ class DataBakerStack(Stack):
 
         self.make_databases()
         self.collect_buckets()
+
+        # Athena workgroup
+        self.workgroup = self.make_athena_workgroup()
+
         self.make_tables()
+
+    def make_athena_workgroup(self) -> athena.CfnWorkGroup:
+        return athena.CfnWorkGroup(
+            self,
+            "dc-data-baker-workgroup-id",
+            name="dc-data-baker",
+            work_group_configuration=athena.CfnWorkGroup.WorkGroupConfigurationProperty(
+                result_configuration=athena.CfnWorkGroup.ResultConfigurationProperty(
+                    output_location=self.buckets_by_name[data_baker_results_bucket.bucket_name].s3_url_for_object(
+                        key="dc-data-baker-athena-results"
+                    )
+                ),
+            ),
+        )
 
     def make_databases(self):
         self.databases_by_name = {}
