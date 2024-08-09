@@ -4,6 +4,11 @@
 
 Orchestration for writing files to s3 to power our APIs
 
+## What this makes
+
+![](databaker.png)
+
+(Update his graph by running `python make_graph.png`)
 
 ## Install
 
