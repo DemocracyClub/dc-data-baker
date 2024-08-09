@@ -1,17 +1,7 @@
 import aws_cdk.aws_glue_alpha as glue
 from layers.buckets import pollingstations_private_data
 from layers.databases import dc_data_baker
-from layers.models import BaseTable, BaseTableColumns
-
-
-class AddressBaseCleanedColumns(BaseTableColumns):
-    uprn: str
-    address: str
-    postcode: str
-    location: str
-    address_type: str
-
-
+from layers.models import BaseTable
 
 addressbase_cleaned_raw = BaseTable(
     table_name="addressbase_cleaned_raw",
@@ -20,13 +10,39 @@ addressbase_cleaned_raw = BaseTable(
     s3_prefix="addressbase/current/addressbase_cleaned_raw/",
     database=dc_data_baker,
     data_format=glue.DataFormat.CSV,
-    columns=AddressBaseCleanedColumns
+    columns={
+        "uprn": glue.Schema.STRING,
+        "address": glue.Schema.STRING,
+        "postcode": glue.Schema.STRING,
+        "location": glue.Schema.STRING,
+        "address_type": glue.Schema.STRING,
+    }
+)
+
+addressbase_partitioned = BaseTable(
+    table_name="addressbase_partitioned",
+    description="Addressbase table partitioned by first letter of postcode. With latitude and longitude columns",
+    s3_prefix="addressbase/{dc_environment}/addressbase_partitioned/",
+    bucket=pollingstations_private_data,
+    database=dc_data_baker,
+    data_format=glue.DataFormat.PARQUET,
+    columns={
+        "outcode": glue.Schema.STRING,
+        "uprn": glue.Schema.STRING,
+        "address": glue.Schema.STRING,
+        "postcode": glue.Schema.STRING,
+        "longitude": glue.Schema.DOUBLE,
+        "latitude": glue.Schema.DOUBLE,
+    },
+    partition_keys=[
+        glue.Column(
+            name="first_letter",
+            type=glue.Schema.STRING,
+        )
+    ],
 )
 
 TABLES = [
-    addressbase_cleaned_raw
+    addressbase_cleaned_raw,
+    addressbase_partitioned
 ]
-
-if __name__ == "__main__":
-    print(addressbase_cleaned_raw)
-    print(addressbase_cleaned_raw.as_glue_definition())

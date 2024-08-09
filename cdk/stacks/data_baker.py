@@ -19,6 +19,10 @@ class DataBakerStack(Stack):
 
         self.dc_environment = self.node.try_get_context("dc-environment")
 
+        self.context = {
+            "dc_environment": self.dc_environment
+        }
+
         self.make_databases()
         self.collect_buckets()
 
@@ -64,14 +68,21 @@ class DataBakerStack(Stack):
     def make_tables(self):
         self.tables_by_name = {}
         for table in TABLES:
+            columns = []
+            for column_name, column_type in table.columns.items():
+                columns.append(glue.Column(
+                    name=column_name, type=column_type, comment=""
+                ))
+
             self.tables_by_name[table.table_name] = glue.S3Table(
                 self,
                 table.table_name,
                 table_name=table.table_name,
                 description=table.description,
                 bucket=self.buckets_by_name[table.bucket.bucket_name],
-                s3_prefix=table.s3_prefix,
+                s3_prefix=table.s3_prefix.format(**self.context),
                 database=self.databases_by_name[table.database.database_name],
-                columns=table.columns.as_glue_definition(),
+                columns=columns,
                 data_format=table.data_format,
+                partition_keys=table.partition_keys
             )
