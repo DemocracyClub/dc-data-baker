@@ -2,6 +2,9 @@ import aws_cdk.aws_glue_alpha as glue
 import aws_cdk.aws_s3 as s3
 from aws_cdk import Stack
 from constructs import Construct
+from layers.buckets import BUCKETS
+from layers.databases import DATABASES
+from layers.tables import TABLES
 
 
 def get_query_text(query):
@@ -15,50 +18,41 @@ class DataBakerStack(Stack):
 
         self.dc_environment = self.node.try_get_context("dc-environment")
 
-        self.dc_data_baker_db = glue.Database(
-            self,
-            "dc-data-baker-db",
-            database_name="dc_data_baker",
-            description="Data base for tables defined by dc data baker",
-        )
+        self.make_databases()
+        self.collect_buckets()
+        self.make_tables()
 
-        self.pollingstations_private_data_bucket = s3.Bucket.from_bucket_name(
-            self,
-            "pollingstations-private-data-bucket",
-            "pollingstations.private.data",
-        )
+    def make_databases(self):
+        self.databases_by_name = {}
+        for database in DATABASES:
+            self.databases_by_name[database.database_name] = glue.Database(
+                self,
+                database.database_name,
+                database_name=database.database_name,
+                description="Data base for tables defined by dc data baker",
+            )
 
-        self.addressbase_cleaned_raw_table()
+    def collect_buckets(self):
+        self.buckets_by_name = {}
 
-    def addressbase_cleaned_raw_table(self):
-        glue.S3Table(
-            self,
-            "addressbase-cleaned-raw-table-id",
-            table_name="addressbase_cleaned_raw",
-            bucket=self.pollingstations_private_data_bucket,
-            s3_prefix="addressbase/current/addressbase_cleaned_raw/",
-            database=self.dc_data_baker_db,
-            columns=[
-                glue.Column(name="uprn", type=glue.Schema.STRING, comment=""),
-                glue.Column(
-                    name="address", type=glue.Schema.STRING, comment=""
-                ),
-                glue.Column(
-                    name="postcode",
-                    type=glue.Schema.STRING,
-                    comment="With Space",
-                ),
-                glue.Column(
-                    name="location",
-                    type=glue.Schema.STRING,
-                    comment="EWKT formatted, SRID=4326",
-                ),
-                glue.Column(
-                    name="address_type",
-                    type=glue.Schema.STRING,
-                    comment="OS coding for the type of address",
-                ),
-            ],
-            data_format=glue.DataFormat.CSV,
-            description="Addressbase table as produced for loading into WDIV",
-        )
+        for bucket in BUCKETS:
+            self.buckets_by_name[bucket.bucket_name] = s3.Bucket.from_bucket_name(
+                self,
+                bucket.bucket_name,
+                bucket.bucket_name,
+            )
+
+    def make_tables(self):
+        self.tables_by_name = {}
+        for table in TABLES:
+            self.tables_by_name[table.table_name] = glue.S3Table(
+                self,
+                table.table_name,
+                table_name=table.table_name,
+                description=table.description,
+                bucket=self.buckets_by_name[table.bucket.bucket_name],
+                s3_prefix=table.s3_prefix,
+                database=self.databases_by_name[table.database.database_name],
+                columns=table.columns.as_glue_definition(),
+                data_format=table.data_format,
+            )
