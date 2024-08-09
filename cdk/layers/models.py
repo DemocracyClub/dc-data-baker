@@ -14,6 +14,12 @@ class GlueDatabase:
 
 
 @dataclass
+class BaseQuery:
+    name: str
+    context: dict
+
+
+@dataclass
 class BaseTable:
     """
     A table is a Python data class that represents an AWS Glue definition
@@ -30,3 +36,4 @@ class BaseTable:
     columns: dict[str: glue.Schema]
     partition_keys: list[glue.Column] = None
     depends_on: list = None
+    populated_with: BaseQuery = None

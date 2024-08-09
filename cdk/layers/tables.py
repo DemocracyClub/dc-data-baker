@@ -1,7 +1,7 @@
 import aws_cdk.aws_glue_alpha as glue
 from layers.buckets import pollingstations_private_data
 from layers.databases import dc_data_baker
-from layers.models import BaseTable
+from layers.models import BaseQuery, BaseTable
 
 addressbase_cleaned_raw = BaseTable(
     table_name="addressbase_cleaned_raw",
@@ -16,7 +16,7 @@ addressbase_cleaned_raw = BaseTable(
         "postcode": glue.Schema.STRING,
         "location": glue.Schema.STRING,
         "address_type": glue.Schema.STRING,
-    }
+    },
 )
 
 addressbase_partitioned = BaseTable(
@@ -40,10 +40,11 @@ addressbase_partitioned = BaseTable(
             type=glue.Schema.STRING,
         )
     ],
-    depends_on=[addressbase_cleaned_raw]
+    depends_on=[addressbase_cleaned_raw],
+    populated_with=BaseQuery(
+        name="partition-addressbase-cleaned.sql",
+        context={"from_table": addressbase_cleaned_raw.table_name},
+    ),
 )
 
-TABLES = [
-    addressbase_cleaned_raw,
-    addressbase_partitioned
-]
+TABLES = [addressbase_cleaned_raw, addressbase_partitioned]

@@ -1,3 +1,6 @@
+from pathlib import Path
+from string import Template
+
 import aws_cdk.aws_glue_alpha as glue
 import aws_cdk.aws_s3 as s3
 from aws_cdk import Stack
@@ -5,6 +8,7 @@ from aws_cdk import aws_athena as athena
 from constructs import Construct
 from layers.buckets import BUCKETS, data_baker_results_bucket
 from layers.databases import DATABASES
+from layers.models import BaseQuery, BaseTable
 from layers.tables import TABLES
 
 
@@ -86,3 +90,24 @@ class DataBakerStack(Stack):
                 data_format=table.data_format,
                 partition_keys=table.partition_keys
             )
+
+            if table.populated_with:
+                self.make_named_query(table, table.populated_with)
+
+    def make_named_query(self, table: BaseTable, query: BaseQuery):
+        file_path = Path(__file__).parent.parent / "queries" / query.name
+        assert file_path.exists()
+        query_context = self.context.copy()
+        query_context["table_full_s3_path"] = f"s3://{table.bucket.bucket_name}/{table.s3_prefix.format(**self.context)}"
+        query_context.update(query.context)
+        with file_path.open() as f:
+            query_str = Template(f.read()).substitute(**query_context)
+
+        return athena.CfnNamedQuery(
+            self,
+            f"{query.name}-id",
+            database=table.database.database_name,
+            query_string=query_str,
+            name=query.name,
+            work_group=self.workgroup.name,
+        )
