@@ -1,3 +1,7 @@
+import sqlglot
+
+# SQL example taken from the Athena docs
+sql = """
 UNLOAD
 (
     SELECT split_part(postcode, ' ', 1) AS outcode,
@@ -13,3 +17,7 @@ TO 's3://foo/table_full_s3_path/'
 WITH (
     format = 'PARQUET', compression = 'SNAPPY', partitioned_by = ARRAY['first_letter']
     )
+
+"""
+
+sqlglot.parse_one(sql, dialect="athena")
