@@ -155,10 +155,10 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aws-cdk-aws-glue-alpha", specifier = ">=2.178.1a0" },
-    { name = "aws-cdk-lib", specifier = ">=2.178.1" },
-    { name = "graphviz", specifier = ">=0.20.3" },
-    { name = "sqlglot", specifier = ">=26.4.1" },
+    { name = "aws-cdk-aws-glue-alpha", specifier = "==2.178.1a0" },
+    { name = "aws-cdk-lib", specifier = "==2.178.1" },
+    { name = "graphviz", specifier = "==0.20.3" },
+    { name = "sqlglot", specifier = "==26.4.1" },
 ]
 
 [package.metadata.requires-dev]

@@ -8,20 +8,19 @@ Orchestration for writing files to s3 to power our APIs
 
 ![](databaker.png)
 
-(Update his graph by running `python make_graph.png`)
+(Update this graph by running `python make_graph.png`)
 
 ## Install
 
 ### Python dependencies
 
-This project uses a pip tools style workflow.
-Use [`uv`](https://github.com/astral-sh/uv) or [`pip-tools`](https://github.com/jazzband/pip-tools).
-Commands given using `uv`. See [`uv` equivalence]() for comparison.
+This project uses [`uv`](https://github.com/astral-sh/uv) to manage python packages.
+[Install uv](https://docs.astral.sh/uv/getting-started/installation/) first if you don't already have it. Then
 
-```shell
-uv venv --prompt . .venv
-uv pip sync requirements/dev.txt
 ```
+uv sync
+```
+
 
 ### Commit hooks
 
@@ -40,39 +39,6 @@ Then
 nvm use --lts
 npm install
 ```
-
-## Managing dependencies
-
-### `uv` equivalence
-
-* `uv pip compile` is equivalent to `pip-compile`
-* `uv pip sync` is equivalent to `pip-sync`
-* `uv venv` is equivalent to `python -m venv`
-
-### Generate requirements/*.txt files
-
-#### base.txt
-`uv pip compile --generate-hashes --output-file requirements/base.txt requirements/base.in`
-
-#### dev.txt
-`uv pip compile --generate-hashes --output-file requirements/dev.txt requirements/base.in requirements/dev.in`
-
-### Upgrade all dependencies
-* Run `uv pip compile --generate-hashes --upgrade --output-file requirements/base.txt requirements/base.in`
-
-### Upgrade a single dependency
-* Run `uv pip compile --generate-hashes --upgrade-package <pkg-name> --output-file requirements/base.txt requirements/base.in`
-
-### Adding a dependency
-
-#### base dependencies
-* Add a dependency to `requirements/base.in`
-* Run `uv pip compile --generate-hashes --output-file requirements/base.txt requirements/base.in`
-
-#### dev dependencies
-* Add a dependency to `requirements/dev.in`
-* Run `uv pip compile --generate-hashes --output-file requirements/dev.txt requirements/base.in requirements/dev.in`
-
 
 ## CDK Setup
 
