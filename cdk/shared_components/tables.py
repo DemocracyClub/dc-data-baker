@@ -1,9 +1,9 @@
 import aws_cdk.aws_glue_alpha as glue
-from layers.buckets import pollingstations_private_data
-from layers.databases import dc_data_baker
-from layers.models import BaseQuery, BaseTable
+from shared_components.buckets import pollingstations_private_data
+from shared_components.databases import dc_data_baker
+from shared_components.models import BaseQuery, GlueTable
 
-addressbase_cleaned_raw = BaseTable(
+addressbase_cleaned_raw = GlueTable(
     table_name="addressbase_cleaned_raw",
     description="Addressbase table as produced for loading into WDIV",
     bucket=pollingstations_private_data,
@@ -19,7 +19,7 @@ addressbase_cleaned_raw = BaseTable(
     },
 )
 
-addressbase_partitioned = BaseTable(
+addressbase_partitioned = GlueTable(
     table_name="addressbase_partitioned",
     description="Addressbase table partitioned by first letter of postcode. With latitude and longitude columns",
     s3_prefix="addressbase/{dc_environment}/addressbase_partitioned/",
@@ -46,5 +46,3 @@ addressbase_partitioned = BaseTable(
         context={"from_table": addressbase_cleaned_raw.table_name},
     ),
 )
-
-TABLES = [addressbase_cleaned_raw, addressbase_partitioned]

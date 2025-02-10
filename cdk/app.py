@@ -3,7 +3,7 @@
 import os
 
 from aws_cdk import App, Environment, Tags
-from stacks.data_baker import DataBakerStack
+from stacks.addressbase import AddressBaseStack
 
 valid_environments = (
     "development",
@@ -27,7 +27,7 @@ assert dc_environment in valid_environments, (
 )
 
 
-DataBakerStack(
+AddressBaseStack(
     app,
     "DataBakerStack",
     env=env,

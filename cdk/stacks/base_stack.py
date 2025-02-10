@@ -1,40 +1,65 @@
+import abc
 from pathlib import Path
 from string import Template
+from typing import List
 
 import aws_cdk.aws_glue_alpha as glue
 import aws_cdk.aws_s3 as s3
+import jsii
 from aws_cdk import Stack
 from aws_cdk import aws_athena as athena
 from constructs import Construct
-from layers.buckets import BUCKETS, data_baker_results_bucket
-from layers.databases import DATABASES
-from layers.models import BaseQuery, BaseTable
-from layers.tables import TABLES
+from shared_components.buckets import data_baker_results_bucket
+from shared_components.databases import DEFAULT_DATABASE
+from shared_components.models import BaseQuery, GlueTable, S3Bucket
 
 
-def get_query_text(query):
-    with open(f"../queries/{query}", "r") as f:
-        return f.read()
+class CDKABCMetaClass(jsii.JSIIMeta, abc.ABCMeta):
+    """
+    Required to allow using @abc.abstractmethod on a subclass of
+    Stack. We want to do this in order to require some methods / properties
+    on stacks
+
+    Used by DataBakerStack below.
+    """
+
+    pass
 
 
-class DataBakerStack(Stack):
-    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+class DataBakerStack(abc.ABC, Stack, metaclass=CDKABCMetaClass):
+    def __init__(self, scope: Construct, construct_id: str, **kwargs):
         super().__init__(scope, construct_id, **kwargs)
 
         self.dc_environment = self.node.try_get_context("dc-environment")
-
         self.context = {"dc_environment": self.dc_environment}
 
-        self.make_databases()
         self.collect_buckets()
-
-        # Athena workgroup
-        self.workgroup = self.make_athena_workgroup()
-
+        self.make_athena_workgroup()
+        self.make_database()
         self.make_tables()
 
-    def make_athena_workgroup(self) -> athena.CfnWorkGroup:
-        return athena.CfnWorkGroup(
+    @staticmethod
+    @abc.abstractmethod
+    def glue_tables() -> List[GlueTable]: ...
+
+    @staticmethod
+    @abc.abstractmethod
+    def s3_buckets() -> List[S3Bucket]: ...
+
+    def make_database(self):
+        self.database = glue.Database(
+            self,
+            DEFAULT_DATABASE.database_name,
+            database_name=DEFAULT_DATABASE.database_name,
+            description="Database for tables defined by DC data baker",
+        )
+
+    def get_query_text(query):
+        with open(f"../queries/{query}", "r") as f:
+            return f.read()
+
+    def make_athena_workgroup(self):
+        self.athena_workgroup = athena.CfnWorkGroup(
             self,
             "dc-data-baker-workgroup-id",
             name="dc-data-baker",
@@ -47,31 +72,9 @@ class DataBakerStack(Stack):
             ),
         )
 
-    def make_databases(self):
-        self.databases_by_name = {}
-        for database in DATABASES:
-            self.databases_by_name[database.database_name] = glue.Database(
-                self,
-                database.database_name,
-                database_name=database.database_name,
-                description="Data base for tables defined by dc data baker",
-            )
-
-    def collect_buckets(self):
-        self.buckets_by_name = {}
-
-        for bucket in BUCKETS:
-            self.buckets_by_name[bucket.bucket_name] = (
-                s3.Bucket.from_bucket_name(
-                    self,
-                    bucket.bucket_name,
-                    bucket.bucket_name,
-                )
-            )
-
     def make_tables(self):
         self.tables_by_name = {}
-        for table in TABLES:
+        for table in self.glue_tables():
             columns = []
             for column_name, column_type in table.columns.items():
                 columns.append(
@@ -85,7 +88,7 @@ class DataBakerStack(Stack):
                 description=table.description,
                 bucket=self.buckets_by_name[table.bucket.bucket_name],
                 s3_prefix=table.s3_prefix.format(**self.context),
-                database=self.databases_by_name[table.database.database_name],
+                database=self.database,
                 columns=columns,
                 data_format=table.data_format,
                 partition_keys=table.partition_keys,
@@ -94,7 +97,7 @@ class DataBakerStack(Stack):
             if table.populated_with:
                 self.make_named_query(table, table.populated_with)
 
-    def make_named_query(self, table: BaseTable, query: BaseQuery):
+    def make_named_query(self, table: GlueTable, query: BaseQuery):
         file_path = Path(__file__).parent.parent / "queries" / query.name
         assert file_path.exists()
         query_context = self.context.copy()
@@ -111,5 +114,17 @@ class DataBakerStack(Stack):
             database=table.database.database_name,
             query_string=query_str,
             name=query.name,
-            work_group=self.workgroup.name,
+            work_group=self.athena_workgroup.name,
         )
+
+    def collect_buckets(self):
+        self.buckets_by_name = {}
+
+        for bucket in self.s3_buckets():
+            self.buckets_by_name[bucket.bucket_name] = (
+                s3.Bucket.from_bucket_name(
+                    self,
+                    bucket.bucket_name,
+                    bucket.bucket_name,
+                )
+            )
