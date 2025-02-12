@@ -4,6 +4,8 @@ import os
 
 from aws_cdk import App, Environment, Tags
 from stacks.addressbase import AddressBaseStack
+from stacks.current_elections import CurrentElectionsStack
+from stacks.data_baker_core import DataBakerCoreStack
 
 valid_environments = (
     "development",
@@ -27,9 +29,21 @@ assert dc_environment in valid_environments, (
 )
 
 
+DataBakerCoreStack(
+    app,
+    "DataBakerCoreStack",
+    env=env,
+)
+
 AddressBaseStack(
     app,
-    "DataBakerStack",
+    "AddressBaseStack",
+    env=env,
+)
+
+CurrentElectionsStack(
+    app,
+    "CurrentElectionsStack",
     env=env,
 )
 
