@@ -14,16 +14,17 @@ list will trigger a re-build of this data package.
 
 from typing import List
 
-import aws_cdk.aws_lambda_python_alpha as aws_lambda_python
 from aws_cdk import (
     Duration,
+    Fn,
     aws_lambda,
+aws_iam as iam,
 )
-from aws_cdk import (
-    aws_iam as iam,
-)
+
 from aws_cdk import aws_stepfunctions as sfn
 from aws_cdk import aws_stepfunctions_tasks as tasks
+import aws_cdk.aws_lambda_python_alpha as aws_lambda_python
+
 from constructs import Construct
 from shared_components.buckets import (
     data_baker_results_bucket,
@@ -40,21 +41,62 @@ from stacks.base_stack import DataBakerStack
 class CurrentElectionsStack(DataBakerStack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
-
-        uprn_to_ballots_first_letter_function = (
-            aws_lambda_python.PythonFunction(
-                self,
-                "uprn_to_ballots_first_letter_function",
-                function_name="uprn_to_ballots_first_letter_function",
-                runtime=aws_lambda.Runtime.PYTHON_3_12,
-                handler="handler",
-                entry="cdk/stacks/current_elections/lambdas/",
-                index="uprn_to_ballots_first_letter.py",
-                timeout=Duration.seconds(900),
-            )
+        self.athena_query_lambda_arn = Fn.import_value(
+            "RunAthenaQueryArnOutput"
+        )
+        self.athena_query_lambda = aws_lambda.Function.from_function_arn(
+            self, "RunAthenaQuery", self.athena_query_lambda_arn
         )
 
-        uprn_to_ballots_first_letter_function.add_to_role_policy(
+        # Fan-out step (for each letter A-Z)
+        parallel_execution = sfn.Parallel(self, "Fan Out Letters")
+        alphabet = [chr(i) for i in range(ord("A"), ord("Z") + 1)]
+        for letter in alphabet:
+            context = current_ballots_joined_to_address_base.populated_with.context.copy()
+            context["first_letter"] = letter
+
+            parallel_execution.branch(
+                tasks.LambdaInvoke(
+                    self,
+                    f"Process {letter}",
+                    lambda_function=self.athena_query_lambda,
+                    payload=sfn.TaskInput.from_object(
+                        {
+                            "context": context,
+                            "QueryName": current_ballots_joined_to_address_base.populated_with.name,
+                            "blocking": True,
+                        }
+                    ),
+                )
+            )
+
+        make_partitions = tasks.LambdaInvoke(
+            self,
+            "Make partitions",
+            lambda_function=self.athena_query_lambda,
+            payload=sfn.TaskInput.from_object(
+                {
+                    "context": {
+                        "table_name": current_ballots_joined_to_address_base.table_name
+                    },
+                    "QueryString": "MSCK REPAIR TABLE `$table_name`;",
+                    "blocking": True,
+                }
+            ),
+        )
+
+        to_outcode_parquet = aws_lambda_python.PythonFunction(
+            self,
+            "first_letter_to_outcode_parquet",
+            function_name="first_letter_to_outcode_parquet",
+            runtime=aws_lambda.Runtime.PYTHON_3_12,
+            handler="handler",
+            entry="cdk/shared_components/lambdas/first_letter_to_outcode_parquet/",
+            index="first_letter_to_outcode_parquet.py",
+            timeout=Duration.seconds(900),
+        )
+
+        to_outcode_parquet.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "athena:*",
@@ -65,70 +107,12 @@ class CurrentElectionsStack(DataBakerStack):
             )
         )
 
-        # first_letter_fan_out = aws_lambda_python.PythonFunction(
-        #     self,
-        #     "first_letter_fan_out",
-        #     function_name="first_letter_fan_out",
-        #     runtime=aws_lambda.Runtime.PYTHON_3_12,
-        #     handler="handler",
-        #     entry="cdk/stacks/current_elections/lambdas/",
-        #     index="first_letter_fan_out.py",
-        #     timeout=Duration.seconds(900),
-        # )
-
-        # join_addressbase_to_current_ballots = tasks.LambdaInvoke(
-        #     self,
-        #     "Run Athena Query",
-        #     lambda_function=uprn_to_ballots_first_letter_function,
-        #     result_path="$.athena_result",
-        # )
-
-        # wait_for_query = sfn.Wait(
-        #     self,
-        #     "WaitForQuery",
-        #     time=sfn.WaitTime.duration(Duration.minutes(1)),
-        # )
-        #
-        # check_query_status = tasks.LambdaInvoke(
-        #     self,
-        #     "Check Query Status",
-        #     lambda_function=uprn_to_ballots_first_letter_function,
-        #     result_path="$.query_status",
-        # )
-
-        # Fan-out step (for each letter A-Z)
-        parallel_execution = sfn.Parallel(self, "Fan Out Letters")
-        alphabet = [chr(i) for i in range(ord("A"), ord("Z") + 1)]
-        for letter in alphabet:
-            parallel_execution.branch(
-                tasks.LambdaInvoke(
-                    self,
-                    f"Process {letter}",
-                    lambda_function=uprn_to_ballots_first_letter_function,
-                    payload=sfn.TaskInput.from_object({"first_letter": letter}),
-                    result_path=f"$.fanout_result.{letter}",
-                )
-            )
-
-        definition = (
-            # join_addressbase_to_current_ballots.next(wait_for_query)
-            # .next(check_query_status)
-            # .next(
-            #     sfn.Choice(self, "Joined EE to AddressBase?")
-            #     .when(
-            #         sfn.Condition.string_equals(
-            #             "$.query_status.Payload.status", "SUCCEEDED"
-            #         ),
-            #         parallel_execution,
-            #     )
-            #     .otherwise(wait_for_query)
-            # )
-            parallel_execution
-        )
+        definition = parallel_execution.next(make_partitions)
 
         sfn.StateMachine(
             self,
-            "AthenaStepFunction",
+            "MakeCurrentElectionsParquet",
+            state_machine_name="MakeCurrentElectionsParquet",
             definition=definition,
             timeout=Duration.minutes(10),
         )

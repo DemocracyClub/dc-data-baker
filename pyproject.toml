@@ -10,6 +10,7 @@ dependencies = [
     "aws-cdk-lib==2.178.1",
     "graphviz==0.20.3",
     "sqlglot==26.4.1",
+    "boto3>=1.36.18",
 ]
 
 [dependency-groups]

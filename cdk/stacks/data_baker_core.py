@@ -9,8 +9,12 @@ For example, the Athena Database and Workgroups
 from typing import List
 
 import aws_cdk.aws_glue_alpha as glue
-from aws_cdk import CfnOutput
+import aws_cdk.aws_lambda_python_alpha as aws_lambda_python
+from aws_cdk import CfnOutput, Duration, aws_lambda
 from aws_cdk import aws_athena as athena
+from aws_cdk import (
+    aws_iam as iam,
+)
 from constructs import Construct
 from shared_components.buckets import (
     data_baker_results_bucket,
@@ -31,6 +35,7 @@ class DataBakerCoreStack(DataBakerStack):
             "dc-data-baker-workgroup-id",
             name="dc-data-baker",
             work_group_configuration=athena.CfnWorkGroup.WorkGroupConfigurationProperty(
+                enforce_work_group_configuration=True,
                 result_configuration=athena.CfnWorkGroup.ResultConfigurationProperty(
                     output_location=self.buckets_by_name[
                         data_baker_results_bucket.bucket_name
@@ -39,6 +44,28 @@ class DataBakerCoreStack(DataBakerStack):
             ),
         )
         self.glue_database = self.make_database()
+
+        run_athena_query_lambda = aws_lambda_python.PythonFunction(
+            self,
+            "run_athena_query_lambda",
+            function_name="run_athena_query_lambda",
+            runtime=aws_lambda.Runtime.PYTHON_3_12,
+            handler="handler",
+            entry="cdk/shared_components/lambdas/",
+            index="run_athena_query_and_report_status.py",
+            timeout=Duration.seconds(900),
+        )
+
+        run_athena_query_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "athena:*",
+                    "s3:*",
+                    "glue:*",
+                ],
+                resources=["*"],
+            )
+        )
 
         CfnOutput(
             self,
@@ -52,6 +79,12 @@ class DataBakerCoreStack(DataBakerStack):
             "GlueDatabaseArnOutput",
             value=self.glue_database.database_arn,
             export_name="DataBakerGlueDatabaseArn",
+        )
+        CfnOutput(
+            self,
+            "RunAthenaQueryArnOutput",
+            value=run_athena_query_lambda.function_arn,
+            export_name="RunAthenaQueryArnOutput",
         )
 
     def make_database(self):
