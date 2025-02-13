@@ -1,4 +1,3 @@
-import io
 import os
 from pathlib import Path
 
@@ -8,7 +7,7 @@ import polars
 s3_client = boto3.client("s3")
 
 
-def lambda_handler(event, context):
+def handler(event, context):
     # Get parameters from the event.
     first_letter = event["first_letter"]
     source_bucket_name = event["source_bucket_name"]
@@ -16,11 +15,11 @@ def lambda_handler(event, context):
     dest_bucket_name = event["dest_bucket_name"]
     dest_path = event["dest_path"]
 
-    prefix = (
-        f"{source_path}/first_letter={first_letter}"
-    )
+    prefix = f"{source_path}/first_letter={first_letter}"
 
-    response = s3_client.list_objects_v2(Bucket=source_bucket_name, Prefix=prefix)
+    response = s3_client.list_objects_v2(
+        Bucket=source_bucket_name, Prefix=prefix
+    )
 
     # Check if there are any objects returned.
     if "Contents" not in response:
@@ -34,12 +33,12 @@ def lambda_handler(event, context):
     BY_OUTCODE_PATH = Path(f"/tmp/by_outcodes/{first_letter}")
     BY_OUTCODE_PATH.mkdir(exist_ok=True, parents=True)
 
-    # for obj in response["Contents"]:
-    #     key = obj["Key"]
-    #     # Use the basename of the key as the local filename.
-    #     local_file = dest_dir / os.path.basename(key)
-    #     print(f"Downloading s3://{source_bucket_name}/{key} to {local_file}")
-    #     s3_client.download_file(source_bucket_name, key, local_file)
+    for obj in response["Contents"]:
+        key = obj["Key"]
+        # Use the basename of the key as the local filename.
+        local_file = LOCAL_SOURCE_DIR / os.path.basename(key)
+        print(f"Downloading s3://{source_bucket_name}/{key} to {local_file}")
+        s3_client.download_file(source_bucket_name, key, local_file)
 
     print(f"{LOCAL_SOURCE_DIR}/*")
     first_letter_data = polars.scan_parquet(f"{LOCAL_SOURCE_DIR}/*")
@@ -52,6 +51,9 @@ def lambda_handler(event, context):
         outcode_df = first_letter_data.filter(polars.col("outcode") == outcode)
         outcode_path = BY_OUTCODE_PATH / f"{outcode}.parquet"
         outcode_df.collect().write_parquet(outcode_path)
+        s3_client.upload_file(
+            outcode_path, dest_bucket_name, f"{dest_path}/{outcode}.parquet"
+        )
 
 
 if __name__ == "__main__":
@@ -63,4 +65,4 @@ if __name__ == "__main__":
         "dest_path": "current_elections_parquet",
     }
     print(event)
-    lambda_handler(event, {})
+    handler(event, {})

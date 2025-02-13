@@ -67,6 +67,28 @@ class DataBakerCoreStack(DataBakerStack):
             )
         )
 
+        empty_s3_bucket_by_prefix_lambda = aws_lambda_python.PythonFunction(
+            self,
+            "empty_s3_bucket_by_prefix",
+            function_name="empty_s3_bucket_by_prefix",
+            runtime=aws_lambda.Runtime.PYTHON_3_12,
+            handler="handler",
+            entry="cdk/shared_components/lambdas/",
+            index="empty_s3_bucket_by_prefix.py",
+            timeout=Duration.seconds(900),
+        )
+
+        empty_s3_bucket_by_prefix_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:*",
+                ],
+                resources=[
+                    "arn:aws:s3:::*",
+                ],
+            )
+        )
+
         CfnOutput(
             self,
             "WorkgroupNameOutput",
@@ -85,6 +107,12 @@ class DataBakerCoreStack(DataBakerStack):
             "RunAthenaQueryArnOutput",
             value=run_athena_query_lambda.function_arn,
             export_name="RunAthenaQueryArnOutput",
+        )
+        CfnOutput(
+            self,
+            "EmptyS3BucketByPrefixArnOutput",
+            value=empty_s3_bucket_by_prefix_lambda.function_arn,
+            export_name="EmptyS3BucketByPrefixArnOutput",
         )
 
     def make_database(self):

@@ -14,17 +14,17 @@ list will trigger a re-build of this data package.
 
 from typing import List
 
+import aws_cdk.aws_lambda_python_alpha as aws_lambda_python
 from aws_cdk import (
     Duration,
     Fn,
     aws_lambda,
-aws_iam as iam,
 )
-
+from aws_cdk import (
+    aws_iam as iam,
+)
 from aws_cdk import aws_stepfunctions as sfn
 from aws_cdk import aws_stepfunctions_tasks as tasks
-import aws_cdk.aws_lambda_python_alpha as aws_lambda_python
-
 from constructs import Construct
 from shared_components.buckets import (
     data_baker_results_bucket,
@@ -94,6 +94,7 @@ class CurrentElectionsStack(DataBakerStack):
             entry="cdk/shared_components/lambdas/first_letter_to_outcode_parquet/",
             index="first_letter_to_outcode_parquet.py",
             timeout=Duration.seconds(900),
+            memory_size=2048,
         )
 
         to_outcode_parquet.add_to_role_policy(
@@ -107,7 +108,35 @@ class CurrentElectionsStack(DataBakerStack):
             )
         )
 
-        definition = parallel_execution.next(make_partitions)
+        # Fan-out step (for each letter A-Z)
+        parallel_outcodes = sfn.Parallel(
+            self, "Make outcode parquet per first letter"
+        )
+        alphabet = [chr(i) for i in range(ord("A"), ord("Z") + 1)]
+        for letter in alphabet:
+            context = current_ballots_joined_to_address_base.populated_with.context.copy()
+            context["first_letter"] = letter
+
+            parallel_outcodes.branch(
+                tasks.LambdaInvoke(
+                    self,
+                    f"Make outcode parquet for {letter}",
+                    lambda_function=to_outcode_parquet,
+                    payload=sfn.TaskInput.from_object(
+                        {
+                            "first_letter": letter,
+                            "source_bucket_name": "dc-data-baker-results-bucket",
+                            "source_path": "current_ballots_joined_to_address_base",
+                            "dest_bucket_name": "dc-data-baker-results-bucket",
+                            "dest_path": "current_elections_parquet",
+                        }
+                    ),
+                )
+            )
+
+        definition = parallel_execution.next(make_partitions).next(
+            parallel_outcodes
+        )
 
         sfn.StateMachine(
             self,
