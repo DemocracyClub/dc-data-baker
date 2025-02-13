@@ -88,13 +88,13 @@ class AddressBaseStack(DataBakerStack):
             ),
         )
 
-        definition = delete_old_objects.next(partition).next(make_partitions)
+        self.state_definition = sfn.Chain.start(delete_old_objects).next(partition).next(make_partitions)
 
-        sfn.StateMachine(
+        self.step_function = sfn.StateMachine(
             self,
             "MakeAddressBasePartitioned",
             state_machine_name="MakeAddressBasePartitioned",
-            definition=definition,
+            definition=self.state_definition,
             timeout=Duration.minutes(10),
         )
 

@@ -134,15 +134,15 @@ class CurrentElectionsStack(DataBakerStack):
                 )
             )
 
-        definition = parallel_execution.next(make_partitions).next(
+        self.state_definition = parallel_execution.next(make_partitions).next(
             parallel_outcodes
         )
 
-        sfn.StateMachine(
+        self.step_function = sfn.StateMachine(
             self,
             "MakeCurrentElectionsParquet",
             state_machine_name="MakeCurrentElectionsParquet",
-            definition=definition,
+            definition=self.state_definition,
             timeout=Duration.minutes(10),
         )
 
