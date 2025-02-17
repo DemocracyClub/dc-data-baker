@@ -6,9 +6,11 @@ readme = "README.md"
 requires-python = "==3.12.*"
 dependencies = [
     "aws-cdk-aws-glue-alpha==2.178.1a0",
+    "aws_cdk.aws_lambda_python_alpha==2.178.1a0",
     "aws-cdk-lib==2.178.1",
     "graphviz==0.20.3",
     "sqlglot==26.4.1",
+    "boto3>=1.36.18",
 ]
 
 [dependency-groups]
