@@ -48,6 +48,34 @@ class CurrentElectionsStack(DataBakerStack):
             self, "RunAthenaQuery", self.athena_query_lambda_arn
         )
 
+        create_current_elections_csv_function = aws_lambda_python.PythonFunction(
+            self,
+            "create_current_elections_csv",
+            function_name="create_current_elections_csv",
+            runtime=aws_lambda.Runtime.PYTHON_3_12,
+            handler="handler",
+            entry="cdk/shared_components/lambdas/create_current_elections_csv",
+            index="create_current_elections_csv.py",
+            timeout=Duration.seconds(900),
+            memory_size=2048,
+        )
+
+        create_current_elections_csv_function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "ssm:*",
+                    "s3:*",
+                ],
+                resources=["*"],
+            )
+        )
+
+        make_current_csv = tasks.LambdaInvoke(
+            self,
+            "Make current elections CSV",
+            lambda_function=create_current_elections_csv_function,
+        )
+
         # Fan-out step (for each letter A-Z)
         parallel_execution = sfn.Parallel(self, "Fan Out Letters")
         alphabet = [chr(i) for i in range(ord("A"), ord("Z") + 1)]
@@ -134,8 +162,10 @@ class CurrentElectionsStack(DataBakerStack):
                 )
             )
 
-        self.state_definition = parallel_execution.next(make_partitions).next(
-            parallel_outcodes
+        self.state_definition = (
+            make_current_csv.next(parallel_execution)
+            .next(make_partitions)
+            .next(parallel_outcodes)
         )
 
         self.step_function = sfn.StateMachine(
