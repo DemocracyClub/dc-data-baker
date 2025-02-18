@@ -8,7 +8,7 @@ Orchestration for writing files to s3 to power our APIs
 
 ![](databaker.png)
 
-(Update this graph by running `python make_graph.png`)
+(Update this graph by running `uv run make_graph.png`)
 
 ## Install
 
@@ -51,85 +51,53 @@ AWS_PROFILE=dev-aggregatorapi-dc DC_ENVIRONMENT=development cdk synth
 ```
 
 
-----------
+# Layers
 
-# CDK Documentation
+The main concept in this repo is that of a 'layer'. This is really an 
+artifact that is produced by code in this repo that can be use elsewhere.
 
-This documentation provides detailed information on the CDK (Cloud Development Kit) setup for deploying various AWS resources. The CDK scripts are organized in several Python modules and scripts that define infrastructure on AWS, primarily using AWS Glue and S3.
+The two current layers are:
 
-## Files and Modules Overview
+## AddressBase Layer
 
-1. **cdk/app.py**
-2. **cdk/layers/** (subpackage)
-   - `__init__.py` (initialization)
-   - `buckets.py`
-   - `databases.py`
-   - `models.py`
-   - `tables.py`
-3. **cdk/stacks/** (subpackage)
-   - `__init__.py` (initialization)
-   - `data_baker.py`
+This is a AWS Glue table with AddressBase in. It's partitioned by first letter
+for speedy filtering. It can be used in Athena. 
 
-### `cdk/app.py`
+The version of AddressBase is taken from the "addressbase cleaned" file 
+that's made in the WDIV account. This is a simple format that squashes 
+address fields into one.
 
-This script initializes the CDK application and sets up the application environment. It determines which AWS account and region to deploy to, configures context settings, and defines tags for all resources.
+## CurrentElections Layer
 
-- **App Initialization**: Creates an AWS CDK app with environment-specific context.
-- **Environment Configuration**: Fetches AWS account and region details.
-- **Validation**: Ensures that the specified environment (`dc-environment`) is valid.
-- **Stack Definition**: Deploys the `DataBakerStack`.
-- **Tags**: Tags each resource with `dc-product` and `dc-environment` for organizational purposes.
+Performs a geo-join on the AddressBase layer and a CSV of every ballot ID 
+and it's division WKT. 
 
-### `cdk/layers/__init__.py`
+At the end of the process, a parquet file per outcode is produced, 
+containing one row per address and for each, a list of ballot IDs.
 
-An empty file for initializing the `layers` package. It does not contain any specific logic.
+This can be used to look up current elections in other applications.
 
-### `cdk/layers/buckets.py`
+## Adding new layers
 
-This file defines S3 buckets using a custom `S3Bucket` data class.
+A layer is really a CDK stack. To make a new layer, make a stack and drive 
+AWS in the way you normally would.
 
-- **pollingstations_private_data**: An S3 bucket for storing private data related to polling stations.
-- **data_baker_results_bucket**: An S3 bucket designed for storing results from the Data Baker service.
-- **BUCKETS List**: A collection of S3 bucket objects to be incorporated into the CDK stack.
+Look at other layers for patterns. Generally we use AWS Lambda, Glue, Athena 
+and Step Functions and S3 to make a ETL pipeline, but your new layer might 
+need other services.
 
-### `cdk/layers/databases.py`
+That being said, there are some handy things you can use:
 
-Defines Glue databases using a custom `GlueDatabase` data class.
+### `run_athena_query_and_report_status`
 
-- **dc_data_baker**: A Glue database object representing a database for storing data related to the DC Data Baker service.
-- **DATABASES List**: Contains defined database objects for use within the CDK stack.
+This is a Lambda function that will run a named Athena query. Saved writing 
+a Lambda per query.
 
-### `cdk/layers/models.py`
+### `empty_s3_bucket_by_prefix`
 
-Defines the data model classes using Python data classes.
+Lambda function that will empty an S3 bucket. This is important because 
+Athena will query all files at a prefix, including duplicates of the same 
+file. e.g if you have 5 copies of AddressBase in a prefix, Athena will 
+return 5 rows per UPRN, or whatever. 
 
-- **S3Bucket**: Defines the structure for an S3 bucket.
-- **GlueDatabase**: Represents the structure of a Glue database.
-- **BaseQuery**: Represents a query with a name and context dictionary.
-- **BaseTable**: Represents an AWS Glue table definition, including critical attributes such as table name, bucket, prefix, data format, columns, and more. It helps define Glue tables and their relationships.
-
-### `cdk/layers/tables.py`
-
-Defines Glue tables based on the `BaseTable` data class.
-
-- **addressbase_cleaned_raw**: Represents a table with the cleaned Addressbase data stored in CSV format.
-- **addressbase_partitioned**: Represents a table with partitioned Addressbase data stored in Parquet format.
-- **TABLES List**: A collection of all tables to be used in the CDK stack.
-
-### `cdk/stacks/__init__.py`
-
-An empty file for initializing the `stacks` package. It does not contain any specific logic.
-
-### `cdk/stacks/data_baker.py`
-
-Implements the `DataBakerStack`, which is a collection of AWS resources provisioned together.
-
-- **DataBakerStack Class**: Extends the `Stack` class to provision resources such as Glue databases, S3 buckets, and Athena workgroups.
-  - **get_query_text Function**: Reads SQL query text from a file.
-  - **make_athena_workgroup Method**: Configures and returns an Athena workgroup for managing query results.
-  - **make_databases Method**: Instantiates Glue databases defined in `DATABASES`.
-  - **collect_buckets Method**: Imports existing buckets specified in `BUCKETS`.
-  - **make_tables Methods**: Creates Glue tables with configurations as specified in `TABLES`. It connects tables with SQL queries using `make_named_query`.
-  - **make_named_query Method**: Creates an Athena named query for querying data in Glue tables.
-
-These modules work together to provision an AWS infrastructure comprising Glue tables and databases, Athena workgroups, and S3 buckets, which are integral parts of the data processing pipeline.
+It's useful to be able to empty a prefix, and this will do that.
