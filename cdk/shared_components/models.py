@@ -20,7 +20,7 @@ class BaseQuery:
 
 
 @dataclass
-class BaseTable:
+class GlueTable:
     """
     A table is a Python data class that represents an AWS Glue definition
 
