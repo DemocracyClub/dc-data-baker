@@ -47,6 +47,28 @@ class CurrentElectionsStack(DataBakerStack):
         self.athena_query_lambda = aws_lambda.Function.from_function_arn(
             self, "RunAthenaQuery", self.athena_query_lambda_arn
         )
+        self.empty_bucket_by_prefix = Fn.import_value(
+            "EmptyS3BucketByPrefixArnOutput"
+        )
+        self.empty_bucket_by_prefix_lambda = (
+            aws_lambda.Function.from_function_arn(
+                self, "EmptyS3BucketByPrefix", self.empty_bucket_by_prefix
+            )
+        )
+
+        delete_old_current_ballots_joined_to_address_base = tasks.LambdaInvoke(
+            self,
+            "Remove old data from S3",
+            lambda_function=self.empty_bucket_by_prefix_lambda,
+            payload=sfn.TaskInput.from_object(
+                {
+                    "bucket": current_ballots_joined_to_address_base.bucket.bucket_name,
+                    "prefix": current_ballots_joined_to_address_base.s3_prefix.format(
+                        **self.context
+                    ),
+                }
+            ),
+        )
 
         create_current_elections_csv_function = aws_lambda_python.PythonFunction(
             self,
@@ -163,7 +185,10 @@ class CurrentElectionsStack(DataBakerStack):
             )
 
         self.state_definition = (
-            make_current_csv.next(parallel_execution)
+            delete_old_current_ballots_joined_to_address_base.next(
+                make_current_csv
+            )
+            .next(parallel_execution)
             .next(make_partitions)
             .next(parallel_outcodes)
         )
