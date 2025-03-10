@@ -22,6 +22,10 @@ def delete_all_objects_with_prefix(bucket_name, prefix):
         response = s3.delete_objects(
             Bucket=bucket_name, Delete={"Objects": batch}
         )
+        if "Errors" in response and response["Errors"]:
+            raise Exception(
+                f"Failed to delete some objects: {response['Errors']}"
+            )
         print("Deleted batch:", response)
 
 
