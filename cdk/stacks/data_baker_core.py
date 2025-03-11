@@ -89,6 +89,29 @@ class DataBakerCoreStack(DataBakerStack):
             )
         )
 
+
+        check_step_function_running_function = aws_lambda_python.PythonFunction(
+            self,
+            "check_step_function_running",
+            function_name="check_step_function_running",
+            runtime=aws_lambda.Runtime.PYTHON_3_12,
+            handler="handler",
+            entry="cdk/shared_components/lambdas/",
+            index="check_step_function_running.py",
+            timeout=Duration.seconds(900),
+        )
+
+        check_step_function_running_function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "states:*",
+                ],
+                resources=[
+                    "*",
+                ],
+            )
+        )
+
         CfnOutput(
             self,
             "WorkgroupNameOutput",
@@ -113,6 +136,12 @@ class DataBakerCoreStack(DataBakerStack):
             "EmptyS3BucketByPrefixArnOutput",
             value=empty_s3_bucket_by_prefix_lambda.function_arn,
             export_name="EmptyS3BucketByPrefixArnOutput",
+        )
+        CfnOutput(
+            self,
+            "CheckStepFunctionRunningArnOutput",
+            value=check_step_function_running_function.function_arn,
+            export_name="CheckStepFunctionRunningArnOutput",
         )
 
     def make_database(self):
