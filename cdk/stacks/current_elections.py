@@ -15,7 +15,17 @@ list will trigger a re-build of this data package.
 from typing import List
 
 import aws_cdk.aws_lambda_python_alpha as aws_lambda_python
-from aws_cdk import Duration, Fn, aws_events, aws_events_targets, aws_lambda
+import aws_cdk.aws_pipes_alpha as aws_pipes_alpha
+import aws_cdk.aws_pipes_sources_alpha as aws_pipes_sources_alpha
+import aws_cdk.aws_pipes_targets_alpha as aws_pipes_targets_alpha
+from aws_cdk import (
+    Duration,
+    Fn,
+    aws_events,
+    aws_events_targets,
+    aws_lambda,
+    aws_sqs,
+)
 from aws_cdk import (
     aws_iam as iam,
 )
@@ -236,20 +246,7 @@ class CurrentElectionsStack(DataBakerStack):
             timeout=Duration.minutes(10),
         )
 
-        one_am = aws_events.Schedule.cron(
-            minute="0", hour="1", timezone="Europe/London"
-        )
-        run_nightly_rule = aws_events.Rule(
-            self, "RebuildCurrentElectionsNightlyTrigger", schedule=one_am
-        )
-
-        run_nightly_rule.add_target(
-            aws_events_targets.SfnStateMachine(
-                state_machine=self.step_function,
-                # If we want to pass data to the step function, we can here:
-                # input=aws_events.RuleTargetInput.from_object({"trigger": "nightly"})
-            )
-        )
+        self.make_event_triggers()
 
     @staticmethod
     def glue_tables() -> List[GlueTable]:
@@ -258,3 +255,63 @@ class CurrentElectionsStack(DataBakerStack):
     @staticmethod
     def s3_buckets() -> List[S3Bucket]:
         return [ee_data_cache_production, data_baker_results_bucket]
+
+    def make_event_triggers(self):
+        one_am = aws_events.Schedule.cron(minute="0", hour="1")
+        run_nightly_rule = aws_events.Rule(
+            self, "RebuildCurrentElectionsNightlyTrigger", schedule=one_am
+        )
+
+        run_nightly_rule.add_target(
+            aws_events_targets.SfnStateMachine(
+                machine=self.step_function,
+                # If we want to pass data to the step function, we can here:
+                # input=aws_events.RuleTargetInput.from_object({"trigger": "nightly"})
+            )
+        )
+
+        event_queue = aws_sqs.Queue(
+            self,
+            "CurrentElectionsEventQueue",
+            fifo=True,
+            content_based_deduplication=True,
+            queue_name="CurrentElectionsEventQueue.fifo",
+            encryption=aws_sqs.QueueEncryption.UNENCRYPTED,
+            delivery_delay=Duration.minutes(5)
+        )
+
+        pipe_role = iam.Role(
+            self,
+            "PipeRole",
+            assumed_by=iam.ServicePrincipal("pipes.amazonaws.com"),
+        )
+        pipe_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "sqs:ReceiveMessage",
+                    "sqs:DeleteMessage",
+                    "sqs:GetQueueAttributes",
+                ],
+                resources=[event_queue.queue_arn],
+            )
+        )
+        pipe_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["states:StartExecution"],
+                resources=[self.step_function.state_machine_arn],
+            )
+        )
+
+        run_current_elections_pipe = aws_pipes_alpha.Pipe(
+            self,
+            "RunCurrentElectionsBuilder",
+            role=pipe_role,
+            source=aws_pipes_sources_alpha.SqsSource(
+                event_queue,
+            ),
+            target=aws_pipes_targets_alpha.SfnStateMachine(
+                self.step_function,
+                invocation_type=aws_pipes_targets_alpha.StateMachineInvocationType.FIRE_AND_FORGET,
+            ),
+
+        )
