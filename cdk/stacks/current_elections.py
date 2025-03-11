@@ -15,11 +15,7 @@ list will trigger a re-build of this data package.
 from typing import List
 
 import aws_cdk.aws_lambda_python_alpha as aws_lambda_python
-from aws_cdk import (
-    Duration,
-    Fn,
-    aws_lambda,
-)
+from aws_cdk import Duration, Fn, aws_events, aws_events_targets, aws_lambda
 from aws_cdk import (
     aws_iam as iam,
 )
@@ -199,6 +195,21 @@ class CurrentElectionsStack(DataBakerStack):
             state_machine_name="MakeCurrentElectionsParquet",
             definition=self.state_definition,
             timeout=Duration.minutes(10),
+        )
+
+        one_am = aws_events.Schedule.cron(
+            minute="0", hour="1", timezone="Europe/London"
+        )
+        run_nightly_rule = aws_events.Rule(
+            self, "RebuildCurrentElectionsNightlyTrigger", schedule=one_am
+        )
+
+        run_nightly_rule.add_target(
+            aws_events_targets.SfnStateMachine(
+                state_machine=self.step_function,
+                # If we want to pass data to the step function, we can here:
+                # input=aws_events.RuleTargetInput.from_object({"trigger": "nightly"})
+            )
         )
 
     @staticmethod
