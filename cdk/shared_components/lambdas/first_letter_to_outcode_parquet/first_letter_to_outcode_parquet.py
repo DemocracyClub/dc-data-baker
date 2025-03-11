@@ -37,20 +37,50 @@ def handler(event, context):
         key = obj["Key"]
         # Use the basename of the key as the local filename.
         local_file = LOCAL_SOURCE_DIR / os.path.basename(key)
-        print(f"Downloading s3://{source_bucket_name}/{key} to {local_file}")
-        s3_client.download_file(source_bucket_name, key, local_file)
+        if not local_file.exists():
+            print(
+                f"Downloading s3://{source_bucket_name}/{key} to {local_file}"
+            )
+            s3_client.download_file(source_bucket_name, key, local_file)
 
     print(f"{LOCAL_SOURCE_DIR}/*")
-    first_letter_data = polars.scan_parquet(f"{LOCAL_SOURCE_DIR}/*")
+    first_letter_data = polars.read_parquet(f"{LOCAL_SOURCE_DIR}/*")
     first_letter_data = first_letter_data.with_columns(
         polars.col("postcode").str.split(" ").list.first().alias("outcode")
     )
-    outcodes = first_letter_data.select("outcode").unique()
-    for outcode, *_other_cols in outcodes.collect().iter_rows():
+
+    outcode_dfs = first_letter_data.partition_by("outcode")
+
+    expr_has_non_null_ballots = (
+        polars.col("ballot_ids")
+        .list.eval(polars.element().is_not_null())
+        .list.sum()
+        .alias("has_non_null_ballots")
+    )
+
+    for outcode_df in outcode_dfs:
+        outcode = outcode_df["outcode"][0]
         print(outcode)
-        outcode_df = first_letter_data.filter(polars.col("outcode") == outcode)
+
+        has_any_non_null_ballots_df = outcode_df.select(
+            (expr_has_non_null_ballots > 0).any().alias("any_row_has_ballots")
+        )
+        has_any_non_null_ballots = has_any_non_null_ballots_df[
+            "any_row_has_ballots"
+        ][0]  # Boolean True/False
+
         outcode_path = BY_OUTCODE_PATH / f"{outcode}.parquet"
-        outcode_df.collect().write_parquet(outcode_path)
+
+        if has_any_non_null_ballots:
+            print(
+                f"At least one UPRN in {outcode} has an election, writing an empty file"
+            )
+            outcode_df.write_parquet(outcode_path)
+        else:
+            print(
+                f"No ballot for any address in {outcode}, writing an empty file"
+            )
+            polars.DataFrame().write_parquet(outcode_path)
         s3_client.upload_file(
             outcode_path, dest_bucket_name, f"{dest_path}/{outcode}.parquet"
         )
