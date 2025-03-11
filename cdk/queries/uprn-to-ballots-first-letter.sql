@@ -2,7 +2,7 @@ UNLOAD (
 		SELECT combined_results.uprn,
 			combined_results.address,
 			combined_results.postcode,
-			array_sort(array_agg(DISTINCT combined_results.election_id)) AS ballot_ids,
+			array_sort(filter(array_agg(DISTINCT combined_results.election_id), x -> x IS NOT NULL)) AS ballot_ids,
 			combined_results.first_letter AS first_letter
 		FROM (
 				SELECT ab.uprn,
