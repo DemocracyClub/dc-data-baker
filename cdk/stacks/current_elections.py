@@ -51,6 +51,16 @@ class CurrentElectionsStack(DataBakerStack):
                 self, "EmptyS3BucketByPrefix", self.empty_bucket_by_prefix
             )
         )
+        self.check_step_function_running = Fn.import_value(
+            "CheckStepFunctionRunningArnOutput"
+        )
+        self.check_step_function_running_function = (
+            aws_lambda.Function.from_function_arn(
+                self,
+                "CheckStepFunctionRunningArnOutput",
+                self.check_step_function_running,
+            )
+        )
 
         delete_old_current_ballots_joined_to_address_base = tasks.LambdaInvoke(
             self,
@@ -180,7 +190,22 @@ class CurrentElectionsStack(DataBakerStack):
                 )
             )
 
-        self.state_definition = (
+        check_task = tasks.LambdaInvoke(
+            self,
+            "CheckConcurrentExecution",
+            lambda_function=self.check_step_function_running_function,
+            payload=sfn.TaskInput.from_object(
+                {
+                    "stateMachineArn.$": "$$.StateMachine.Id",
+                    "currentExecutionArn.$": "$$.Execution.Id",
+                }
+            ),
+            output_path="$.Payload",
+        )
+
+        decision = sfn.Choice(self, "CanProceed?")
+
+        main_tasks = (
             delete_old_current_ballots_joined_to_address_base.next(
                 make_current_csv
             )
@@ -188,6 +213,20 @@ class CurrentElectionsStack(DataBakerStack):
             .next(make_partitions)
             .next(parallel_outcodes)
         )
+
+        fail_state = sfn.Fail(
+            self,
+            "StopExecution",
+            cause="ConcurrentExecution",
+            error="AnotherExecutionRunning",
+        )
+
+        decision.when(
+            sfn.Condition.boolean_equals("$.proceed", True), main_tasks
+        )
+        decision.otherwise(fail_state)
+
+        self.state_definition = check_task.next(decision)
 
         self.step_function = sfn.StateMachine(
             self,
