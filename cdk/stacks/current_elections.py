@@ -257,19 +257,6 @@ class CurrentElectionsStack(DataBakerStack):
         return [ee_data_cache_production, data_baker_results_bucket]
 
     def make_event_triggers(self):
-        one_am = aws_events.Schedule.cron(minute="0", hour="1")
-        run_nightly_rule = aws_events.Rule(
-            self, "RebuildCurrentElectionsNightlyTrigger", schedule=one_am
-        )
-
-        run_nightly_rule.add_target(
-            aws_events_targets.SfnStateMachine(
-                machine=self.step_function,
-                # If we want to pass data to the step function, we can here:
-                # input=aws_events.RuleTargetInput.from_object({"trigger": "nightly"})
-            )
-        )
-
         event_queue = aws_sqs.Queue(
             self,
             "CurrentElectionsEventQueue",
@@ -277,7 +264,20 @@ class CurrentElectionsStack(DataBakerStack):
             content_based_deduplication=True,
             queue_name="CurrentElectionsEventQueue.fifo",
             encryption=aws_sqs.QueueEncryption.UNENCRYPTED,
-            delivery_delay=Duration.minutes(5)
+            delivery_delay=Duration.minutes(5),
+        )
+
+        one_am = aws_events.Schedule.cron(minute="0", hour="1")
+        run_nightly_rule = aws_events.Rule(
+            self, "RebuildCurrentElectionsNightlyTrigger", schedule=one_am
+        )
+
+        run_nightly_rule.add_target(
+            aws_events_targets.SqsQueue(
+                event_queue,
+                message=aws_events.RuleTargetInput.from_text("Nightly re-run"),
+                message_group_id="elections_set_changed",
+            )
         )
 
         pipe_role = iam.Role(
@@ -302,7 +302,7 @@ class CurrentElectionsStack(DataBakerStack):
             )
         )
 
-        run_current_elections_pipe = aws_pipes_alpha.Pipe(
+        aws_pipes_alpha.Pipe(
             self,
             "RunCurrentElectionsBuilder",
             role=pipe_role,
@@ -313,5 +313,4 @@ class CurrentElectionsStack(DataBakerStack):
                 self.step_function,
                 invocation_type=aws_pipes_targets_alpha.StateMachineInvocationType.FIRE_AND_FORGET,
             ),
-
         )
