@@ -69,6 +69,22 @@ wheels = [
 ]
 
 [[package]]
+name = "aws-cdk-aws-kinesisfirehose-alpha"
+version = "2.178.1a0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aws-cdk-lib" },
+    { name = "constructs" },
+    { name = "jsii" },
+    { name = "publication" },
+    { name = "typeguard" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/54/0f/a07985bdf0ca575a4f42fc9442f09c56b9456f941b77b81299a14f5c7035/aws_cdk_aws_kinesisfirehose_alpha-2.178.1a0.tar.gz", hash = "sha256:00ae6392f4f87ede0b731c44c76fac031c95dd9d10b77dc75230564a7478bcbd", size = 127744 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ad/34/e98390b573065634723d91a41a6f53a5a0ab30ce80339698d8a97b21ae4b/aws_cdk.aws_kinesisfirehose_alpha-2.178.1a0-py3-none-any.whl", hash = "sha256:87b2b889a652aeda509b09b75d28ab317d6b71d41681406ba55a7f8d39c85d55", size = 118618 },
+]
+
+[[package]]
 name = "aws-cdk-aws-lambda-python-alpha"
 version = "2.178.1a0"
 source = { registry = "https://pypi.org/simple" }
@@ -82,6 +98,57 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/19/b9/d22d6007cc5eb0fcb4aa785242efb2169ae913c933b23888bf9b1a5a213b/aws_cdk_aws_lambda_python_alpha-2.178.1a0.tar.gz", hash = "sha256:5a044728935bd584f15cc168491e5424e550135f5729ee7fd29e48e6ce41434b", size = 85183 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ba/dc/7aac9d76962555527ee4740a5146a55031e4ed87de6c8346c3069f346fe7/aws_cdk.aws_lambda_python_alpha-2.178.1a0-py3-none-any.whl", hash = "sha256:15560cc63d85f51dc09b42deb60066cd5cd1d9cb7d744f7808833f58d6a8ab8a", size = 84578 },
+]
+
+[[package]]
+name = "aws-cdk-aws-pipes-alpha"
+version = "2.178.1a0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aws-cdk-aws-kinesisfirehose-alpha" },
+    { name = "aws-cdk-lib" },
+    { name = "constructs" },
+    { name = "jsii" },
+    { name = "publication" },
+    { name = "typeguard" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/89/9a/ff400fb834613600a2d3f4472644b3d1d74837ddb546c09b7855e214fe6a/aws_cdk_aws_pipes_alpha-2.178.1a0.tar.gz", hash = "sha256:5337c57edd99ac020f16a717f21a2617715742fa585ad16f3c89cdccb539729e", size = 123132 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c1/d8/f4834dbc1205c4a1190498fc42e65ccf6bf9e40d5cf038f698230acc93ef/aws_cdk.aws_pipes_alpha-2.178.1a0-py3-none-any.whl", hash = "sha256:07902da0aa28e961aa56d388b7af638a0dca80c275f611c2730f20e66d2acf64", size = 121376 },
+]
+
+[[package]]
+name = "aws-cdk-aws-pipes-sources-alpha"
+version = "2.178.1a0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aws-cdk-aws-pipes-alpha" },
+    { name = "aws-cdk-lib" },
+    { name = "constructs" },
+    { name = "jsii" },
+    { name = "publication" },
+    { name = "typeguard" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c1/dc/25b6286f847e7bd828fd5ac93c18520b4b2810b829f5fb926764aae4eea3/aws_cdk_aws_pipes_sources_alpha-2.178.1a0.tar.gz", hash = "sha256:ee0b6c334f77c40c368d60ea810f3dcb60c1f1c74958d7730ef96b0e2848d5df", size = 57353 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ba/62/0acf20c341c06fd777dc600edcbb721e862aa64d44ba43f44a050143e5f7/aws_cdk.aws_pipes_sources_alpha-2.178.1a0-py3-none-any.whl", hash = "sha256:f3ea3f45f013043c7c19ed0706bec983b523b81dcf1aa2092ba96cc754ef88d1", size = 56185 },
+]
+
+[[package]]
+name = "aws-cdk-aws-pipes-targets-alpha"
+version = "2.178.1a0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aws-cdk-aws-pipes-alpha" },
+    { name = "aws-cdk-lib" },
+    { name = "constructs" },
+    { name = "jsii" },
+    { name = "publication" },
+    { name = "typeguard" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d9/6b/1d5a3d2e4ad18b6b86d6f50c34fb6721e39597e2825ce00d4d529c44bc14/aws_cdk_aws_pipes_targets_alpha-2.178.1a0.tar.gz", hash = "sha256:4896df624585b73dafd877aca975a7f9a4f68ba6784b560cb9902b462bb453bd", size = 78897 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8c/b0/95b84414d651965381664acf5d9024330a9fd2d429555938b2c13ae70d97/aws_cdk.aws_pipes_targets_alpha-2.178.1a0-py3-none-any.whl", hash = "sha256:06e453702fd7a466caad8390e7cc7a2a1ba0ffa2506627e30458c4c477f8a6e4", size = 77476 },
 ]
 
 [[package]]
@@ -187,6 +254,9 @@ source = { virtual = "." }
 dependencies = [
     { name = "aws-cdk-aws-glue-alpha" },
     { name = "aws-cdk-aws-lambda-python-alpha" },
+    { name = "aws-cdk-aws-pipes-alpha" },
+    { name = "aws-cdk-aws-pipes-sources-alpha" },
+    { name = "aws-cdk-aws-pipes-targets-alpha" },
     { name = "aws-cdk-lib" },
     { name = "boto3" },
     { name = "graphviz" },
@@ -203,6 +273,9 @@ dev = [
 requires-dist = [
     { name = "aws-cdk-aws-glue-alpha", specifier = "==2.178.1a0" },
     { name = "aws-cdk-aws-lambda-python-alpha", specifier = "==2.178.1a0" },
+    { name = "aws-cdk-aws-pipes-alpha", specifier = ">=2.178.1a0" },
+    { name = "aws-cdk-aws-pipes-sources-alpha", specifier = ">=2.178.1a0" },
+    { name = "aws-cdk-aws-pipes-targets-alpha", specifier = ">=2.178.1a0" },
     { name = "aws-cdk-lib", specifier = "==2.178.1" },
     { name = "boto3", specifier = ">=1.36.18" },
     { name = "graphviz", specifier = "==0.20.3" },
