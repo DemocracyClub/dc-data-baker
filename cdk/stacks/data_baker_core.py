@@ -89,7 +89,6 @@ class DataBakerCoreStack(DataBakerStack):
             )
         )
 
-
         check_step_function_running_function = aws_lambda_python.PythonFunction(
             self,
             "check_step_function_running",
@@ -110,6 +109,21 @@ class DataBakerCoreStack(DataBakerStack):
                     "*",
                 ],
             )
+        )
+
+        get_glue_table_location_lambda = aws_lambda_python.PythonFunction(
+            self,
+            "get_glue_table_location",
+            function_name="get_glue_table_location",
+            runtime=aws_lambda.Runtime.PYTHON_3_12,
+            handler="handler",
+            entry="cdk/shared_components/lambdas/get_glue_table_location",
+            index="get_glue_table_location.py",
+            timeout=Duration.seconds(300),
+        )
+
+        get_glue_table_location_lambda.add_to_role_policy(
+            iam.PolicyStatement(actions=["glue:GetTable"], resources=["*"]),
         )
 
         CfnOutput(
@@ -142,6 +156,12 @@ class DataBakerCoreStack(DataBakerStack):
             "CheckStepFunctionRunningArnOutput",
             value=check_step_function_running_function.function_arn,
             export_name="CheckStepFunctionRunningArnOutput",
+        )
+        CfnOutput(
+            self,
+            "GetGlueTableLocationArnOutput",
+            value=get_glue_table_location_lambda.function_arn,
+            export_name="GetGlueTableLocationArnOutput",
         )
 
     def make_database(self):
