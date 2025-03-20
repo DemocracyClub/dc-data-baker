@@ -76,7 +76,7 @@ def handler(event, context):
         response = get_named_query_by_name(saved_query_name)
         query_string = response["QueryString"]
 
-    # The query can contain $foo template strings that are replaced with
+    # The query can contain {foo} placeholder strings that are replaced with
     # items in event["context"]
     formatted_query = query_string.format(**event.get("context", {}))
 

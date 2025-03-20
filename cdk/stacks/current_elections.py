@@ -36,6 +36,9 @@ from shared_components.buckets import (
     data_baker_results_bucket,
     ee_data_cache_production,
 )
+from shared_components.constructs.addressbase_source_check_construct import (
+    AddressBaseSourceCheckConstruct,
+)
 from shared_components.models import GlueTable, S3Bucket
 from shared_components.tables import (
     current_ballots,
@@ -215,6 +218,13 @@ class CurrentElectionsStack(DataBakerStack):
 
         decision = sfn.Choice(self, "CanProceed?")
 
+        addressbase_check = AddressBaseSourceCheckConstruct(
+            self,
+            "AddressBaseSourceCheck",
+            athena_query_lambda=self.athena_query_lambda,
+            table_name=current_ballots_joined_to_address_base.table_name,
+        )
+
         main_tasks = (
             delete_old_current_ballots_joined_to_address_base.next(
                 make_current_csv
@@ -222,6 +232,7 @@ class CurrentElectionsStack(DataBakerStack):
             .next(parallel_execution)
             .next(make_partitions)
             .next(parallel_outcodes)
+            .next(addressbase_check.entry_point)
         )
 
         fail_state = sfn.Fail(

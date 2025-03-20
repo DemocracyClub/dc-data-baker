@@ -20,6 +20,10 @@ from shared_components.buckets import (
     data_baker_results_bucket,
     pollingstations_private_data,
 )
+from shared_components.constructs.addressbase_source_check_construct import (
+    AddressBaseSourceCheckConstruct,
+)
+from shared_components.databases import dc_data_baker
 from shared_components.models import GlueTable, S3Bucket
 from shared_components.tables import (
     addressbase_cleaned_raw,
@@ -46,7 +50,31 @@ class AddressBaseStack(DataBakerStack):
                 self, "EmptyS3BucketByPrefix", self.empty_bucket_by_prefix
             )
         )
+        self.get_glue_table_location_arn = Fn.import_value(
+            "GetGlueTableLocationArnOutput"
+        )
+        self.get_glue_table_location_lambda = (
+            aws_lambda.Function.from_function_arn(
+                self, "GetGlueTableLocation", self.get_glue_table_location_arn
+            )
+        )
         context = addressbase_partitioned.populated_with.context.copy()
+        addressbase_source = "addressbase_source"
+        get_addressbase_cleaned_raw_glue_table_location = tasks.LambdaInvoke(
+            self,
+            "Get addressbase cleaned raw glue table location",
+            lambda_function=self.get_glue_table_location_lambda,
+            payload=sfn.TaskInput.from_object(
+                {
+                    "database": dc_data_baker.database_name,
+                    "table": addressbase_cleaned_raw.table_name,
+                }
+            ),
+            query_language=sfn.QueryLanguage.JSONATA,
+            assign={
+                addressbase_source: "{% $states.result.Payload.addressbase_cleaned_raw_location %}"
+            },
+        )
         delete_old_objects = tasks.LambdaInvoke(
             self,
             "Remove old data from S3",
@@ -60,6 +88,7 @@ class AddressBaseStack(DataBakerStack):
                 }
             ),
         )
+        context[addressbase_source] = "{% $addressbase_source %}"
         partition = tasks.LambdaInvoke(
             self,
             "Partition AddressBase Cleaned",
@@ -71,6 +100,7 @@ class AddressBaseStack(DataBakerStack):
                     "blocking": True,
                 }
             ),
+            query_language=sfn.QueryLanguage.JSONATA,
         )
 
         make_partitions = tasks.LambdaInvoke(
@@ -88,7 +118,20 @@ class AddressBaseStack(DataBakerStack):
             ),
         )
 
-        self.state_definition = sfn.Chain.start(delete_old_objects).next(partition).next(make_partitions)
+        addressbase_check = AddressBaseSourceCheckConstruct(
+            self,
+            "AddressBaseSourceCheck",
+            athena_query_lambda=self.athena_query_lambda,
+            table_name=addressbase_partitioned.table_name,
+        )
+
+        self.state_definition = (
+            sfn.Chain.start(get_addressbase_cleaned_raw_glue_table_location)
+            .next(delete_old_objects)
+            .next(partition)
+            .next(make_partitions)
+            .next(addressbase_check.entry_point)
+        )
 
         self.step_function = sfn.StateMachine(
             self,
