@@ -37,6 +37,7 @@ addressbase_partitioned = GlueTable(
         "postcode": glue.Schema.STRING,
         "longitude": glue.Schema.DOUBLE,
         "latitude": glue.Schema.DOUBLE,
+        "addressbase_source": glue.Schema.STRING,
     },
     partition_keys=[
         glue.Column(

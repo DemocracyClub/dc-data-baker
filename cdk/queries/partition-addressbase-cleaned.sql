@@ -6,6 +6,7 @@ UNLOAD
        postcode,
        ST_X(ST_GeometryFromText(split_part(location, ';', 2))) AS longitude,
        ST_Y(ST_GeometryFromText(split_part(location, ';', 2))) AS latitude,
+       '{addressbase_source}' as addressbase_source,
        substr(postcode, 1, 1) AS first_letter
     FROM "$from_table"
 )
