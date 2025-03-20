@@ -56,7 +56,7 @@ class AddressBaseStack(DataBakerStack):
             )
         )
         context = addressbase_partitioned.populated_with.context.copy()
-
+        addressbase_source = "addressbase_source"
         get_addressbase_cleaned_raw_glue_table_location = tasks.LambdaInvoke(
             self,
             "Get addressbase cleaned raw glue table location",
@@ -69,7 +69,7 @@ class AddressBaseStack(DataBakerStack):
             ),
             query_language=sfn.QueryLanguage.JSONATA,
             assign={
-                "addressbase_source": "{% $states.result.Payload.addressbase_cleaned_raw_location %}"
+                addressbase_source: "{% $states.result.Payload.addressbase_cleaned_raw_location %}"
             },
         )
         delete_old_objects = tasks.LambdaInvoke(
@@ -85,6 +85,7 @@ class AddressBaseStack(DataBakerStack):
                 }
             ),
         )
+        context[addressbase_source] = "{% $addressbase_source %}"
         partition = tasks.LambdaInvoke(
             self,
             "Partition AddressBase Cleaned",
@@ -96,6 +97,7 @@ class AddressBaseStack(DataBakerStack):
                     "blocking": True,
                 }
             ),
+            query_language=sfn.QueryLanguage.JSONATA,
         )
 
         make_partitions = tasks.LambdaInvoke(
