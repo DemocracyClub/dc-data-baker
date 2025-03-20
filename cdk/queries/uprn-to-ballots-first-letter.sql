@@ -2,6 +2,7 @@ UNLOAD (
 		SELECT combined_results.uprn,
 			combined_results.address,
 			combined_results.postcode,
+			combined_results.addressbase_source,
 			array_sort(filter(array_agg(DISTINCT combined_results.election_id), x -> x IS NOT NULL)) AS ballot_ids,
 			combined_results.first_letter AS first_letter
 		FROM (
@@ -9,6 +10,7 @@ UNLOAD (
 					ab.address,
 					ab.postcode,
 					ab.first_letter,
+					ab.addressbase_source,
 					cb.election_id
 				FROM addressbase_partitioned ab
 					LEFT JOIN current_ballots cb ON ST_CONTAINS(
@@ -22,6 +24,7 @@ UNLOAD (
 					ab.address,
 					ab.postcode,
 					ab.first_letter,
+					ab.addressbase_source,
 					cb.election_id
 				FROM addressbase_partitioned ab
 					LEFT JOIN current_ballots cb ON ST_CONTAINS(
@@ -34,6 +37,7 @@ UNLOAD (
 		GROUP BY combined_results.uprn,
 			combined_results.address,
 			combined_results.postcode,
+			combined_results.addressbase_source,
 			combined_results.first_letter
 	) TO 's3://dc-data-baker-results-bucket/current_ballots_joined_to_address_base/' WITH (
 		format = 'PARQUET',

@@ -78,7 +78,10 @@ current_ballots_joined_to_address_base = GlueTable(
         "uprn": glue.Schema.STRING,
         "address": glue.Schema.STRING,
         "postcode": glue.Schema.STRING,
-        "ballot_ids": glue.Schema.array(input_string="string", is_primitive=True),
+        "addressbase_source": glue.Schema.STRING,
+        "ballot_ids": glue.Schema.array(
+            input_string="string", is_primitive=True
+        ),
         "first_letter": glue.Schema.STRING,
     },
     populated_with=BaseQuery(
