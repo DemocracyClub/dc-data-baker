@@ -20,6 +20,9 @@ from shared_components.buckets import (
     data_baker_results_bucket,
     pollingstations_private_data,
 )
+from shared_components.constructs.addressbase_source_check_construct import (
+    AddressBaseSourceCheckConstruct,
+)
 from shared_components.databases import dc_data_baker
 from shared_components.models import GlueTable, S3Bucket
 from shared_components.tables import (
@@ -115,11 +118,19 @@ class AddressBaseStack(DataBakerStack):
             ),
         )
 
+        addressbase_check = AddressBaseSourceCheckConstruct(
+            self,
+            "AddressBaseSourceCheck",
+            athena_query_lambda=self.athena_query_lambda,
+            table_name=addressbase_partitioned.table_name,
+        )
+
         self.state_definition = (
             sfn.Chain.start(get_addressbase_cleaned_raw_glue_table_location)
             .next(delete_old_objects)
             .next(partition)
             .next(make_partitions)
+            .next(addressbase_check.entry_point)
         )
 
         self.step_function = sfn.StateMachine(
