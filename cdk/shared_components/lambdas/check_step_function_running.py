@@ -13,9 +13,12 @@ def handler(event, context):
     )
     executions = response.get("executions", [])
     while next_token := response.get("nextToken"):
-        response = client.list_executions(stateMachineArn=state_machine_arn, statusFilter="RUNNING", next_token=next_token)
+        response = client.list_executions(
+            stateMachineArn=state_machine_arn,
+            statusFilter="RUNNING",
+            next_token=next_token,
+        )
         executions += response.get("executions", [])
-
 
     # Filter out the current execution
     other_executions = [
