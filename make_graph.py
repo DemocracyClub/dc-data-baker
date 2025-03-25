@@ -78,8 +78,9 @@ class StepFunctionGraph:
         self._process_state(self.start_state, graph)
         return graph
 
-    def _process_state(self, state_name: str, graph: Digraph,
-                       visited: set = None):
+    def _process_state(
+        self, state_name: str, graph: Digraph, visited: set = None
+    ):
         if visited is None:
             visited = set()
         if state_name in visited:
@@ -129,7 +130,7 @@ for stack in cdk_app.node.children:
         step_function_cluster.attr(
             style="filled", color="darkgrey", fontsize="16"
         )
-        step_function_cluster.attr('node', shape='rectangle')
+        step_function_cluster.attr("node", shape="rectangle")
         step_function_cluster.attr(newrank="true", rankdir="TB")
         step_function_graph_maker = StepFunctionGraph(
             stack, stack.state_definition
