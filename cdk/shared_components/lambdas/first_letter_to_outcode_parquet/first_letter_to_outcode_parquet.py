@@ -15,7 +15,7 @@ def handler(event, context):
     dest_bucket_name = event["dest_bucket_name"]
     dest_path = event["dest_path"]
 
-    prefix = f"{source_path}/first_letter={first_letter}"
+    prefix = f"{source_path}first_letter={first_letter}"
 
     response = s3_client.list_objects_v2(
         Bucket=source_bucket_name, Prefix=prefix

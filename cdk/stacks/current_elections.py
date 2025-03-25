@@ -195,7 +195,9 @@ class CurrentElectionsStack(DataBakerStack):
                         {
                             "first_letter": letter,
                             "source_bucket_name": current_ballots_joined_to_address_base.bucket.bucket_name,
-                            "source_path": current_ballots_joined_to_address_base.s3_prefix,
+                            "source_path": current_ballots_joined_to_address_base.s3_prefix.format(
+                                dc_environment=self.dc_environment
+                            ),
                             "dest_bucket_name": pollingstations_private_data.bucket_name,
                             "dest_path": f"addressbase/{self.dc_environment}/current_elections_parquet",
                         }
