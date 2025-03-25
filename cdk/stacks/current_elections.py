@@ -33,8 +33,8 @@ from aws_cdk import aws_stepfunctions as sfn
 from aws_cdk import aws_stepfunctions_tasks as tasks
 from constructs import Construct
 from shared_components.buckets import (
-    data_baker_results_bucket,
     ee_data_cache_production,
+    pollingstations_private_data,
 )
 from shared_components.constructs.addressbase_source_check_construct import (
     AddressBaseSourceCheckConstruct,
@@ -194,10 +194,10 @@ class CurrentElectionsStack(DataBakerStack):
                     payload=sfn.TaskInput.from_object(
                         {
                             "first_letter": letter,
-                            "source_bucket_name": "dc-data-baker-results-bucket",
-                            "source_path": "current_ballots_joined_to_address_base",
-                            "dest_bucket_name": "dc-data-baker-results-bucket",
-                            "dest_path": "current_elections_parquet",
+                            "source_bucket_name": current_ballots_joined_to_address_base.bucket.bucket_name,
+                            "source_path": current_ballots_joined_to_address_base.s3_prefix,
+                            "dest_bucket_name": pollingstations_private_data.bucket_name,
+                            "dest_path": f"addressbase/{self.dc_environment}/current_elections_parquet",
                         }
                     ),
                 )
@@ -265,7 +265,7 @@ class CurrentElectionsStack(DataBakerStack):
 
     @staticmethod
     def s3_buckets() -> List[S3Bucket]:
-        return [ee_data_cache_production, data_baker_results_bucket]
+        return [ee_data_cache_production, pollingstations_private_data]
 
     def make_event_triggers(self):
         event_queue = aws_sqs.Queue(
