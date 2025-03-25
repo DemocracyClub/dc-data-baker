@@ -39,7 +39,7 @@ UNLOAD (
 			combined_results.postcode,
 			combined_results.addressbase_source,
 			combined_results.first_letter
-	) TO 's3://dc-data-baker-results-bucket/current_ballots_joined_to_address_base/' WITH (
+	) TO '$table_full_s3_path' WITH (
 		format = 'PARQUET',
 		compression = 'SNAPPY',
 		partitioned_by = ARRAY [ 'first_letter' ]
