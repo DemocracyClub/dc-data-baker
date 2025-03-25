@@ -17,7 +17,6 @@ from aws_cdk import aws_stepfunctions as sfn
 from aws_cdk import aws_stepfunctions_tasks as tasks
 from constructs import Construct
 from shared_components.buckets import (
-    data_baker_results_bucket,
     pollingstations_private_data,
 )
 from shared_components.constructs.addressbase_source_check_construct import (
@@ -147,4 +146,4 @@ class AddressBaseStack(DataBakerStack):
 
     @staticmethod
     def s3_buckets() -> List[S3Bucket]:
-        return [pollingstations_private_data, data_baker_results_bucket]
+        return [pollingstations_private_data]

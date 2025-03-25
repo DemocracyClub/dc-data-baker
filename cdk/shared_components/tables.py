@@ -1,6 +1,5 @@
 import aws_cdk.aws_glue_alpha as glue
 from shared_components.buckets import (
-    data_baker_results_bucket,
     ee_data_cache_production,
     pollingstations_private_data,
 )
@@ -70,8 +69,8 @@ current_ballots = GlueTable(
 current_ballots_joined_to_address_base = GlueTable(
     table_name="current_ballots_joined_to_address_base",
     description="A list of current ballots per UPRN",
-    s3_prefix="current_ballots_joined_to_address_base/",
-    bucket=data_baker_results_bucket,
+    s3_prefix="addressbase/{dc_environment}/current_ballots_joined_to_address_base/",
+    bucket=pollingstations_private_data,
     database=dc_data_baker,
     data_format=glue.DataFormat.PARQUET,
     columns={
