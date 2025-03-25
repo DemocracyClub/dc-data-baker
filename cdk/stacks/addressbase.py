@@ -111,7 +111,7 @@ class AddressBaseStack(DataBakerStack):
                     "context": {
                         "table_name": addressbase_partitioned.table_name
                     },
-                    "QueryString": "MSCK REPAIR TABLE `$table_name`;",
+                    "QueryString": "MSCK REPAIR TABLE `{table_name}`;",
                     "blocking": True,
                 }
             ),
