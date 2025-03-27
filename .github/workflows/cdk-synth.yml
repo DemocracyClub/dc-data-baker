@@ -1,0 +1,58 @@
+name: CDK Synth
+
+on:
+#  workflow_run:
+#    workflows: ["Build and Test"]
+#    types: [completed]
+  push:
+    branches: [github-actions-deploy]
+
+permissions:
+  id-token: write
+
+jobs:
+  cdk-synth-development:
+    name: CDK Synth (Development)
+    runs-on: ubuntu-22.04
+    environment: development
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: CDK Synth Development
+        uses: ./.github/actions/cdk-synth
+        with:
+          dc-environment: ${{ vars.DC_ENVIRONMENT }}
+          aws-role-arn: ${{ secrets.AWS_ROLE_ARN }}
+
+  cdk-synth-staging:
+    name: CDK Synth (Staging)
+    if: ${{ github.ref == 'refs/heads/github-actions-deploy' }} # ToDo: Change to main
+    needs: cdk-synth-development
+    runs-on: ubuntu-22.04
+    environment: staging
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: CDK Synth Staging
+        uses: ./.github/actions/cdk-synth
+        with:
+          dc-environment: ${{ vars.DC_ENVIRONMENT }}
+          aws-role-arn: ${{ secrets.AWS_ROLE_ARN }}
+
+  cdk-synth-production:
+    name: CDK Synth (Production)
+    if: ${{ github.ref == 'refs/heads/main' }}
+    needs: cdk-synth-staging
+    runs-on: ubuntu-22.04
+    environment: production
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: CDK Synth Production
+        uses: ./.github/actions/cdk-synth
+        with:
+          dc-environment: ${{ vars.DC_ENVIRONMENT }}
+          aws-role-arn: ${{ secrets.AWS_ROLE_ARN }}

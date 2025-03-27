@@ -12,22 +12,12 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-        with:
-          persist-credentials: false
 
-      - name: Install python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+      - name: Python setup
+        uses: ./.github/actions/python-setup
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-          cache-suffix: "uv-cache-v1"
-          cache-dependency-glob: |
-            **/uv.lock
-            **/pyproject.toml
+      - name: Node setup
+        uses: ./.github/actions/node-setup
 
       - name: Check Workflows
         run: uvx zizmor --format sarif . > zizmor-results.sarif
@@ -39,7 +29,6 @@ jobs:
 #        with:
 #          sarif_file: zizmor-results.sarif
 #          category: zizmor
-
 
       - name: Pre-test checks
         run: uv run scripts/code-check
