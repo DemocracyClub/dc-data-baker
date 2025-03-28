@@ -1,9 +1,6 @@
 name: Build and Test
 
-on:
-  push:
-    branches: [github-actions-deploy]
-
+on: push
 
 jobs:
   build-and-test:

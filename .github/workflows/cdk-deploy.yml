@@ -1,0 +1,58 @@
+name: CDK Deploy
+
+on:
+#  workflow_run:
+#    workflows: ["Build and Test"]
+#    types: [completed]
+  push:
+    branches: [github-actions-deploy]
+
+permissions:
+  id-token: write
+
+jobs:
+  cdk-deploy-development:
+    name: CDK Deploy (Development)
+    runs-on: ubuntu-22.04
+    environment: development
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: CDK Deploy Development
+        uses: ./.github/actions/cdk-deploy
+        with:
+          dc-environment: ${{ vars.DC_ENVIRONMENT }}
+          aws-role-arn: ${{ secrets.AWS_ROLE_ARN }}
+
+  cdk-deploy-staging:
+    name: CDK Deploy (Staging)
+    if: ${{ github.ref == 'refs/heads/github-actions-deploy' }} # ToDo: Change to main
+    needs: cdk-deploy-development
+    runs-on: ubuntu-22.04
+    environment: staging
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: CDK Deploy Staging
+        uses: ./.github/actions/cdk-deploy
+        with:
+          dc-environment: ${{ vars.DC_ENVIRONMENT }}
+          aws-role-arn: ${{ secrets.AWS_ROLE_ARN }}
+
+  cdk-deploy-production:
+    name: CDK Deploy (Production)
+    if: ${{ github.ref == 'refs/heads/main' }}
+    needs: cdk-deploy-staging
+    runs-on: ubuntu-22.04
+    environment: production
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: CDK Deploy Production
+        uses: ./.github/actions/cdk-deploy
+        with:
+          dc-environment: ${{ vars.DC_ENVIRONMENT }}
+          aws-role-arn: ${{ secrets.AWS_ROLE_ARN }}
