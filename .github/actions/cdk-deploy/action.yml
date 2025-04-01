@@ -22,7 +22,7 @@ runs:
         role-to-assume: ${{ inputs.aws-role-arn }}
 
     - name: CDK Deploy
-      run: scripts/cdk-deploy --all --concurrency 3 --require-approval never --asset-parallelism true --outputs-file cdk-outputs.json
+      run: scripts/cdk-deploy.sh --all --concurrency 3 --require-approval never --asset-parallelism true --outputs-file cdk-outputs.json
       shell: bash
       env:
         DC_ENVIRONMENT: ${{ inputs.dc-environment }}
