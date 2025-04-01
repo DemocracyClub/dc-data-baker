@@ -1,0 +1,95 @@
+name: Production Test & Deploy
+run-name: ${{ github.ref_name }} (prod)
+on:
+  push:
+    branches:
+      - 'main'
+permissions: {}
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install
+        uses: ./.github/actions/install
+
+      - name: Test
+        uses: ./.github/actions/test
+
+  stage-cdk-synth:
+    name: CDK Synth (Staging)
+    environment: staging
+    runs-on: ubuntu-22.04
+    needs: build-and-test
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: CDK Synth
+        uses: ./.github/actions/cdk-synth
+        with:
+          dc-environment: ${{ vars.DC_ENVIRONMENT }}
+
+  prod-cdk-synth:
+    name: CDK Synth (Production)
+    environment: production
+    needs: build-and-test
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: CDK Synth
+        uses: ./.github/actions/cdk-synth
+        with:
+          dc-environment: ${{ vars.DC_ENVIRONMENT }}
+
+  stage-cdk-deploy:
+    name: CDK Deploy (Staging)
+    environment: staging
+    needs: stage-cdk-synth
+    permissions:
+        id-token: write
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: CDK Deploy
+        uses: ./.github/actions/cdk-deploy
+        with:
+          dc-environment: ${{ vars.DC_ENVIRONMENT }}
+          aws-role-arn: ${{ secrets.AWS_ROLE_ARN }}
+
+  prod-cdk-deploy:
+    name: CDK Deploy (Production)
+    environment: production
+    needs: [prod-cdk-synth, stage-cdk-deploy]
+    permissions:
+        id-token: write
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: CDK Deploy
+        uses: ./.github/actions/cdk-deploy
+        with:
+          dc-environment: ${{ vars.DC_ENVIRONMENT }}
+          aws-role-arn: ${{ secrets.AWS_ROLE_ARN }}
