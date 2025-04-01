@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - 'main'
+      - 'github-actions-deploy'  # ToDo: Remove this line before merge
+
 permissions: {}
 
 jobs:
