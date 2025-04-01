@@ -1,0 +1,21 @@
+name: 'Python Setup'
+description: 'Install uv, python and dependencies'
+
+runs:
+  using: composite
+  steps:
+    - name: Install python
+      uses: actions/setup-python@v5
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+      with:
+        enable-cache: true
+        cache-suffix: "uv-cache-v1"
+        cache-dependency-glob: |
+          **/uv.lock
+          **/pyproject.toml
+
+    - name: Create venv
+      run: uv sync
+      shell: bash
