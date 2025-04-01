@@ -1,0 +1,10 @@
+runs:
+  using: composite
+  steps:
+    - name: Check Workflows
+      shell: bash
+      run: uvx zizmor .
+
+    - name: Pre-test checks
+      shell: bash
+      run: uv run scripts/code-check
