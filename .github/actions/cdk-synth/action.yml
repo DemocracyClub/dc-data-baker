@@ -14,7 +14,7 @@ runs:
       uses: ./.github/actions/install
 
     - name: CDK Synth
-      run: scripts/cdk-synth --all
+      run: scripts/cdk-synth.sh --all
       shell: bash
       env:
         DC_ENVIRONMENT: ${{ inputs.dc-environment }}

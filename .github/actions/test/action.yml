@@ -10,4 +10,4 @@ runs:
 
     - name: Pre-test checks
       shell: bash
-      run: uv run scripts/code-check
+      run: uv run scripts/code-check.sh
