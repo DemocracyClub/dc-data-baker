@@ -19,6 +19,7 @@ import aws_cdk.aws_pipes_alpha as aws_pipes_alpha
 import aws_cdk.aws_pipes_sources_alpha as aws_pipes_sources_alpha
 import aws_cdk.aws_pipes_targets_alpha as aws_pipes_targets_alpha
 from aws_cdk import (
+    CfnOutput,
     Duration,
     Fn,
     aws_events,
@@ -260,6 +261,13 @@ class CurrentElectionsStack(DataBakerStack):
         )
 
         self.make_event_triggers()
+
+        CfnOutput(
+            self,
+            "MakeCurrentElectionsParquetArnOutput",
+            value=self.step_function.state_machine_arn,
+            export_name="MakeCurrentElectionsParquetArn",
+        )
 
     @staticmethod
     def glue_tables() -> List[GlueTable]:
