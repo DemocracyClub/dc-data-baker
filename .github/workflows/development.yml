@@ -18,3 +18,19 @@ jobs:
 
       - name: Test
         uses: ./.github/actions/test
+
+  cdk-synth:
+    name: CDK Synth (Dev)
+    environment: development
+    runs-on: ubuntu-22.04
+    needs: build-and-test
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: CDK Synth
+        uses: ./.github/actions/cdk-synth
+        with:
+          dc-environment: ${{ vars.DC_ENVIRONMENT }}
