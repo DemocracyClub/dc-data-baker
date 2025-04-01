@@ -9,6 +9,7 @@ partitioned by the first letter of the postcode.
 from typing import List
 
 from aws_cdk import (
+    CfnOutput,
     Duration,
     Fn,
     aws_lambda,
@@ -138,6 +139,13 @@ class AddressBaseStack(DataBakerStack):
             state_machine_name="MakeAddressBasePartitioned",
             definition=self.state_definition,
             timeout=Duration.minutes(10),
+        )
+
+        CfnOutput(
+            self,
+            "MakeAddressBasePartitionedArnOutput",
+            value=self.step_function.state_machine_arn,
+            export_name="MakeAddressBasePartitionedArn",
         )
 
     @staticmethod
