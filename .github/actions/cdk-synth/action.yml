@@ -25,4 +25,5 @@ runs:
 #      run: |
 #        sudo apt install -y graphviz
 #        uv run make_graph.py
-#        git diff --exit-code || (echo "Please update graph and commit changes." && exit 1)
+#        git diff --exit-code || \
+#          (echo "Please update graph and commit changes." && exit 1)

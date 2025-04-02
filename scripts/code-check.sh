@@ -3,6 +3,7 @@ set -euxo pipefail
 
 uv run ruff format . --check
 uv run ruff check .
+uvx yamllint .github
 
 if command -v shellcheck &> /dev/null; then
   shellcheck scripts/*.sh

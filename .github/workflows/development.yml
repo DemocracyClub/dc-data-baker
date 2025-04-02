@@ -4,6 +4,7 @@ on:
   push
 permissions: {}
 
+
 jobs:
   build-and-test:
     runs-on: ubuntu-22.04
@@ -38,7 +39,7 @@ jobs:
   cdk-deploy:
     name: CDK Deploy (Dev)
     permissions:
-        id-token: write
+      id-token: write
     environment: development
     runs-on: ubuntu-22.04
     needs: cdk-synth
