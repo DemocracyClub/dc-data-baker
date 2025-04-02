@@ -59,7 +59,7 @@ jobs:
     environment: staging
     needs: stage-cdk-synth
     permissions:
-        id-token: write
+      id-token: write
     runs-on: ubuntu-22.04
 
     steps:
@@ -79,7 +79,7 @@ jobs:
     environment: production
     needs: [prod-cdk-synth, stage-cdk-deploy]
     permissions:
-        id-token: write
+      id-token: write
     runs-on: ubuntu-22.04
 
     steps:
