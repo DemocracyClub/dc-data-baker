@@ -7,9 +7,13 @@ updates:
   - package-ecosystem: npm
     directory: "/"
     schedule:
-    interval: daily
+      interval: daily
     open-pull-requests-limit: 10
     groups:
-    cdk-js-libs:
-      patterns:
-        - "*cdk*"
+      cdk-js-libs:
+        patterns:
+          - "*cdk*"
+  - package-ecosystem: "github-actions"
+    directory: "/.github"
+    schedule:
+      interval: daily
