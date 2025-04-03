@@ -19,6 +19,7 @@ import aws_cdk.aws_pipes_alpha as aws_pipes_alpha
 import aws_cdk.aws_pipes_sources_alpha as aws_pipes_sources_alpha
 import aws_cdk.aws_pipes_targets_alpha as aws_pipes_targets_alpha
 from aws_cdk import (
+    CfnOutput,
     Duration,
     Fn,
     aws_events,
@@ -29,6 +30,7 @@ from aws_cdk import (
 from aws_cdk import (
     aws_iam as iam,
 )
+from aws_cdk import aws_ssm as ssm
 from aws_cdk import aws_stepfunctions as sfn
 from aws_cdk import aws_stepfunctions_tasks as tasks
 from constructs import Construct
@@ -74,6 +76,8 @@ class CurrentElectionsStack(DataBakerStack):
                 self.check_step_function_running,
             )
         )
+
+        self.org_id = self.get_org_id()
 
         delete_old_current_ballots_joined_to_address_base = tasks.LambdaInvoke(
             self,
@@ -261,6 +265,13 @@ class CurrentElectionsStack(DataBakerStack):
 
         self.make_event_triggers()
 
+        CfnOutput(
+            self,
+            "MakeCurrentElectionsParquetArnOutput",
+            value=self.step_function.state_machine_arn,
+            export_name="MakeCurrentElectionsParquetArn",
+        )
+
     @staticmethod
     def glue_tables() -> List[GlueTable]:
         return [current_ballots, current_ballots_joined_to_address_base]
@@ -268,6 +279,11 @@ class CurrentElectionsStack(DataBakerStack):
     @staticmethod
     def s3_buckets() -> List[S3Bucket]:
         return [ee_data_cache_production, pollingstations_private_data]
+
+    def get_org_id(self) -> str:
+        return ssm.StringParameter.value_for_string_parameter(
+            self, "OrganisationID"
+        )
 
     def make_event_triggers(self):
         event_queue = aws_sqs.Queue(
@@ -278,6 +294,21 @@ class CurrentElectionsStack(DataBakerStack):
             queue_name="CurrentElectionsEventQueue.fifo",
             encryption=aws_sqs.QueueEncryption.UNENCRYPTED,
             delivery_delay=Duration.minutes(5),
+        )
+
+        event_queue.add_to_resource_policy(
+            statement=iam.PolicyStatement(
+                principals=[iam.ServicePrincipal("ec2.amazonaws.com")],
+                actions=[
+                    "sqs:ReceiveMessage",
+                    "sqs:DeleteMessage",
+                    "sqs:GetQueueAttributes",
+                ],
+                resources=[event_queue.queue_arn],
+                conditions={
+                    "StringEquals": {"aws:PrincipalOrgID": self.org_id}
+                },
+            )
         )
 
         one_am = aws_events.Schedule.cron(minute="0", hour="1")
