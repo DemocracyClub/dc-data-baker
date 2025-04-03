@@ -1,0 +1,29 @@
+---
+name: 'CDK Synth'
+description: 'Check CDK output is valid'
+inputs:
+  dc-environment:
+    description: 'Environment to deploy to (development, staging, production)'
+    required: true
+
+runs:
+  using: composite
+  steps:
+
+    - name: Python setup
+      uses: ./.github/actions/install
+
+    - name: CDK Synth
+      run: scripts/cdk-synth.sh --all
+      shell: bash
+      env:
+        DC_ENVIRONMENT: ${{ inputs.dc-environment }}
+
+#   ToDo: This produces changes on CI, but not when run locally.
+#    - name: Check Diagram
+#      shell: bash
+#      run: |
+#        sudo apt install -y graphviz
+#        uv run make_graph.py
+#        git diff --exit-code || \
+#          (echo "Please update graph and commit changes." && exit 1)

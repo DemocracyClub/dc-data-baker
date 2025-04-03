@@ -1,0 +1,56 @@
+name: Development Test & Deploy
+run-name: ${{ github.ref_name }} (dev)
+on:
+  push
+permissions: {}
+
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install
+        uses: ./.github/actions/install
+
+      - name: Test
+        uses: ./.github/actions/test
+
+  cdk-synth:
+    name: CDK Synth (Dev)
+    environment: development
+    runs-on: ubuntu-22.04
+    needs: build-and-test
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: CDK Synth
+        uses: ./.github/actions/cdk-synth
+        with:
+          dc-environment: ${{ vars.DC_ENVIRONMENT }}
+
+  cdk-deploy:
+    name: CDK Deploy (Dev)
+    permissions:
+      id-token: write
+    environment: development
+    runs-on: ubuntu-22.04
+    needs: cdk-synth
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: CDK Deploy
+        uses: ./.github/actions/cdk-deploy
+        with:
+          dc-environment: ${{ vars.DC_ENVIRONMENT }}
+          aws-role-arn: ${{ secrets.AWS_ROLE_ARN }}

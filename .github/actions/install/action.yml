@@ -1,0 +1,14 @@
+name: 'Install'
+description: 'Installs everything needed to run the app'
+
+runs:
+  using: composite
+  steps:
+    - name: Check out repository
+      uses: actions/checkout@v4
+
+    - name: Python setup
+      uses: ./.github/actions/python-setup
+
+    - name: Node setup
+      uses: ./.github/actions/node-setup
