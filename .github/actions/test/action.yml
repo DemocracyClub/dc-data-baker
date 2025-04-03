@@ -1,3 +1,6 @@
+name: 'Test'
+description: 'Code qa and tests'
+
 runs:
   using: composite
   steps:

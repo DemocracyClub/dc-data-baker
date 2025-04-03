@@ -1,3 +1,6 @@
+name: 'Install'
+description: 'Installs everything needed to run the app'
+
 runs:
   using: composite
   steps:
