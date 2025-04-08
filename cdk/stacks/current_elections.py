@@ -208,6 +208,7 @@ class CurrentElectionsStack(DataBakerStack):
         )
 
         self.make_run_nightly_rule(event_queue)
+        self.make_rebuild_election_parquet_rule(event_queue)
         self.make_sqs_to_sfn_pipe(event_queue)
 
     def make_sqs_to_sfn_pipe(self, event_queue):
@@ -258,6 +259,21 @@ class CurrentElectionsStack(DataBakerStack):
                 message=aws_events.RuleTargetInput.from_text("Nightly re-run"),
                 message_group_id="elections_set_changed",
             )
+        )
+
+    def make_rebuild_election_parquet_rule(self, event_queue):
+        aws_events.Rule(
+            self,
+            "RebuildCurrentElectionsParquetTrigger",
+            targets=[
+                aws_events_targets.SqsQueue(
+                    event_queue,
+                    message_group_id="elections_set_changed",
+                ),
+            ],
+            event_pattern=aws_events.EventPattern(
+                detail_type=["elections_set_changed"]
+            ),
         )
 
     def make_delete_old_current_ballots_joined_to_addressbase_task(
