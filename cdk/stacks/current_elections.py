@@ -76,20 +76,98 @@ class CurrentElectionsStack(DataBakerStack):
             )
         )
 
-        delete_old_current_ballots_joined_to_address_base = tasks.LambdaInvoke(
-            self,
-            "Remove old data from S3",
-            lambda_function=self.empty_bucket_by_prefix_lambda,
-            payload=sfn.TaskInput.from_object(
-                {
-                    "bucket": current_ballots_joined_to_address_base.bucket.bucket_name,
-                    "prefix": current_ballots_joined_to_address_base.s3_prefix.format(
-                        **self.context
-                    ),
-                }
-            ),
+        delete_old_current_ballots_joined_to_addressbase_task = (
+            self.make_delete_old_current_ballots_joined_to_addressbase_task()
         )
 
+        parallel_first_letter_task = self.make_parallel_first_letter_task()
+
+        make_partitions = self.make_partitions_task()
+
+        # Fan-out step (for each letter A-Z)
+        parallel_outcodes_task = self.make_parallel_outcodes_task()
+
+        create_current_csv_task = self.make_create_current_csv_task()
+
+        addressbase_check = AddressBaseSourceCheckConstruct(
+            self,
+            "AddressBaseSourceCheck",
+            athena_query_lambda=self.athena_query_lambda,
+            table_name=current_ballots_joined_to_address_base.table_name,
+        )
+
+        main_tasks = (
+            delete_old_current_ballots_joined_to_addressbase_task.next(
+                create_current_csv_task
+            )
+            .next(parallel_first_letter_task)
+            .next(make_partitions)
+            .next(parallel_outcodes_task)
+            .next(addressbase_check.entry_point)
+        )
+
+        should_run_decision = self.make_should_run_decision(main_tasks)
+        check_step_function_running_task = (
+            self.make_check_step_function_running_task()
+        )
+        state_definition = check_step_function_running_task.next(
+            should_run_decision
+        )
+
+        self.step_function = sfn.StateMachine(
+            self,
+            "MakeCurrentElectionsParquet",
+            state_machine_name="MakeCurrentElectionsParquet",
+            definition=state_definition,
+            timeout=Duration.minutes(10),
+        )
+
+        self.make_event_triggers()
+
+        CfnOutput(
+            self,
+            "MakeCurrentElectionsParquetArnOutput",
+            value=self.step_function.state_machine_arn,
+            export_name="MakeCurrentElectionsParquetArn",
+        )
+
+    @staticmethod
+    def glue_tables() -> List[GlueTable]:
+        return [current_ballots, current_ballots_joined_to_address_base]
+
+    @staticmethod
+    def s3_buckets() -> List[S3Bucket]:
+        return [ee_data_cache_production, pollingstations_private_data]
+
+    def make_should_run_decision(self, main_tasks) -> sfn.Choice:
+        fail_state = sfn.Fail(
+            self,
+            "StopExecution",
+            cause="ConcurrentExecution",
+            error="AnotherExecutionRunning",
+        )
+        decision = sfn.Choice(self, "CanProceed?")
+        decision.when(
+            sfn.Condition.boolean_equals("$.proceed", True), main_tasks
+        )
+        decision.otherwise(fail_state)
+        return decision
+
+    def make_check_step_function_running_task(self) -> tasks.LambdaInvoke:
+        return tasks.LambdaInvoke(
+            self,
+            "CheckConcurrentExecution",
+            lambda_function=self.check_step_function_running_function,
+            payload=sfn.TaskInput.from_object(
+                {
+                    "stateMachineArn.$": "$$.StateMachine.Id",
+                    "currentExecutionArn.$": "$$.Execution.Id",
+                }
+            ),
+            output_path="$.Payload",
+        )
+
+    def make_create_current_csv_task(self) -> tasks.LambdaInvoke:
         create_current_elections_csv_function = aws_lambda_python.PythonFunction(
             self,
             "create_current_elections_csv",
@@ -112,170 +190,11 @@ class CurrentElectionsStack(DataBakerStack):
             )
         )
 
-        make_current_csv = tasks.LambdaInvoke(
+        return tasks.LambdaInvoke(
             self,
             "Make current elections CSV",
             lambda_function=create_current_elections_csv_function,
         )
-
-        # Fan-out step (for each letter A-Z)
-        parallel_execution = sfn.Parallel(self, "Fan Out Letters")
-        alphabet = [chr(i) for i in range(ord("A"), ord("Z") + 1)]
-        for letter in alphabet:
-            context = current_ballots_joined_to_address_base.populated_with.context.copy()
-            context["first_letter"] = letter
-
-            parallel_execution.branch(
-                tasks.LambdaInvoke(
-                    self,
-                    f"Process {letter}",
-                    lambda_function=self.athena_query_lambda,
-                    payload=sfn.TaskInput.from_object(
-                        {
-                            "context": context,
-                            "QueryName": current_ballots_joined_to_address_base.populated_with.name,
-                            "blocking": True,
-                        }
-                    ),
-                )
-            )
-
-        make_partitions = tasks.LambdaInvoke(
-            self,
-            "Make partitions",
-            lambda_function=self.athena_query_lambda,
-            payload=sfn.TaskInput.from_object(
-                {
-                    "context": {
-                        "table_name": current_ballots_joined_to_address_base.table_name
-                    },
-                    "QueryString": "MSCK REPAIR TABLE `$table_name`;",
-                    "blocking": True,
-                }
-            ),
-        )
-
-        to_outcode_parquet = aws_lambda_python.PythonFunction(
-            self,
-            "first_letter_to_outcode_parquet",
-            function_name="first_letter_to_outcode_parquet",
-            runtime=aws_lambda.Runtime.PYTHON_3_12,
-            handler="handler",
-            entry="cdk/shared_components/lambdas/first_letter_to_outcode_parquet/",
-            index="first_letter_to_outcode_parquet.py",
-            timeout=Duration.seconds(900),
-            memory_size=2048,
-        )
-
-        to_outcode_parquet.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "athena:*",
-                    "s3:*",
-                    "glue:*",
-                ],
-                resources=["*"],
-            )
-        )
-
-        # Fan-out step (for each letter A-Z)
-        parallel_outcodes = sfn.Parallel(
-            self, "Make outcode parquet per first letter"
-        )
-        alphabet = [chr(i) for i in range(ord("A"), ord("Z") + 1)]
-        for letter in alphabet:
-            context = current_ballots_joined_to_address_base.populated_with.context.copy()
-            context["first_letter"] = letter
-
-            parallel_outcodes.branch(
-                tasks.LambdaInvoke(
-                    self,
-                    f"Make outcode parquet for {letter}",
-                    lambda_function=to_outcode_parquet,
-                    payload=sfn.TaskInput.from_object(
-                        {
-                            "first_letter": letter,
-                            "source_bucket_name": current_ballots_joined_to_address_base.bucket.bucket_name,
-                            "source_path": current_ballots_joined_to_address_base.s3_prefix.format(
-                                dc_environment=self.dc_environment
-                            ),
-                            "dest_bucket_name": pollingstations_private_data.bucket_name,
-                            "dest_path": f"addressbase/{self.dc_environment}/current_elections_parquet",
-                        }
-                    ),
-                )
-            )
-
-        check_task = tasks.LambdaInvoke(
-            self,
-            "CheckConcurrentExecution",
-            lambda_function=self.check_step_function_running_function,
-            payload=sfn.TaskInput.from_object(
-                {
-                    "stateMachineArn.$": "$$.StateMachine.Id",
-                    "currentExecutionArn.$": "$$.Execution.Id",
-                }
-            ),
-            output_path="$.Payload",
-        )
-
-        decision = sfn.Choice(self, "CanProceed?")
-
-        addressbase_check = AddressBaseSourceCheckConstruct(
-            self,
-            "AddressBaseSourceCheck",
-            athena_query_lambda=self.athena_query_lambda,
-            table_name=current_ballots_joined_to_address_base.table_name,
-        )
-
-        main_tasks = (
-            delete_old_current_ballots_joined_to_address_base.next(
-                make_current_csv
-            )
-            .next(parallel_execution)
-            .next(make_partitions)
-            .next(parallel_outcodes)
-            .next(addressbase_check.entry_point)
-        )
-
-        fail_state = sfn.Fail(
-            self,
-            "StopExecution",
-            cause="ConcurrentExecution",
-            error="AnotherExecutionRunning",
-        )
-
-        decision.when(
-            sfn.Condition.boolean_equals("$.proceed", True), main_tasks
-        )
-        decision.otherwise(fail_state)
-
-        self.state_definition = check_task.next(decision)
-
-        self.step_function = sfn.StateMachine(
-            self,
-            "MakeCurrentElectionsParquet",
-            state_machine_name="MakeCurrentElectionsParquet",
-            definition=self.state_definition,
-            timeout=Duration.minutes(10),
-        )
-
-        self.make_event_triggers()
-
-        CfnOutput(
-            self,
-            "MakeCurrentElectionsParquetArnOutput",
-            value=self.step_function.state_machine_arn,
-            export_name="MakeCurrentElectionsParquetArn",
-        )
-
-    @staticmethod
-    def glue_tables() -> List[GlueTable]:
-        return [current_ballots, current_ballots_joined_to_address_base]
-
-    @staticmethod
-    def s3_buckets() -> List[S3Bucket]:
-        return [ee_data_cache_production, pollingstations_private_data]
 
     def make_event_triggers(self):
         event_queue = aws_sqs.Queue(
@@ -288,19 +207,10 @@ class CurrentElectionsStack(DataBakerStack):
             delivery_delay=Duration.minutes(5),
         )
 
-        one_am = aws_events.Schedule.cron(minute="0", hour="1")
-        run_nightly_rule = aws_events.Rule(
-            self, "RebuildCurrentElectionsNightlyTrigger", schedule=one_am
-        )
+        self.make_run_nightly_rule(event_queue)
+        self.make_sqs_to_sfn_pipe(event_queue)
 
-        run_nightly_rule.add_target(
-            aws_events_targets.SqsQueue(
-                event_queue,
-                message=aws_events.RuleTargetInput.from_text("Nightly re-run"),
-                message_group_id="elections_set_changed",
-            )
-        )
-
+    def make_sqs_to_sfn_pipe(self, event_queue):
         pipe_role = iam.Role(
             self,
             "PipeRole",
@@ -335,3 +245,130 @@ class CurrentElectionsStack(DataBakerStack):
                 invocation_type=aws_pipes_targets_alpha.StateMachineInvocationType.FIRE_AND_FORGET,
             ),
         )
+
+    def make_run_nightly_rule(self, event_queue: aws_sqs.Queue):
+        one_am = aws_events.Schedule.cron(minute="0", hour="1")
+        run_nightly_rule = aws_events.Rule(
+            self, "RebuildCurrentElectionsNightlyTrigger", schedule=one_am
+        )
+
+        run_nightly_rule.add_target(
+            aws_events_targets.SqsQueue(
+                event_queue,
+                message=aws_events.RuleTargetInput.from_text("Nightly re-run"),
+                message_group_id="elections_set_changed",
+            )
+        )
+
+    def make_delete_old_current_ballots_joined_to_addressbase_task(
+        self,
+    ) -> tasks.LambdaInvoke:
+        return tasks.LambdaInvoke(
+            self,
+            "Remove old data from S3",
+            lambda_function=self.empty_bucket_by_prefix_lambda,
+            payload=sfn.TaskInput.from_object(
+                {
+                    "bucket": current_ballots_joined_to_address_base.bucket.bucket_name,
+                    "prefix": current_ballots_joined_to_address_base.s3_prefix.format(
+                        **self.context
+                    ),
+                }
+            ),
+        )
+
+    def make_partitions_task(self) -> tasks.LambdaInvoke:
+        return tasks.LambdaInvoke(
+            self,
+            "Make partitions",
+            lambda_function=self.athena_query_lambda,
+            payload=sfn.TaskInput.from_object(
+                {
+                    "context": {
+                        "table_name": current_ballots_joined_to_address_base.table_name
+                    },
+                    "QueryString": "MSCK REPAIR TABLE `$table_name`;",
+                    "blocking": True,
+                }
+            ),
+        )
+
+    def make_to_outcode_parquet_task(self) -> tasks.LambdaInvoke:
+        to_outcode_parquet = aws_lambda_python.PythonFunction(
+            self,
+            "first_letter_to_outcode_parquet",
+            function_name="first_letter_to_outcode_parquet",
+            runtime=aws_lambda.Runtime.PYTHON_3_12,
+            handler="handler",
+            entry="cdk/shared_components/lambdas/first_letter_to_outcode_parquet/",
+            index="first_letter_to_outcode_parquet.py",
+            timeout=Duration.seconds(900),
+            memory_size=2048,
+        )
+
+        to_outcode_parquet.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "athena:*",
+                    "s3:*",
+                    "glue:*",
+                ],
+                resources=["*"],
+            )
+        )
+
+        return to_outcode_parquet
+
+    def make_parallel_outcodes_task(self) -> sfn.Parallel:
+        to_outcode_parquet = self.make_to_outcode_parquet_task()
+        parallel_outcodes = sfn.Parallel(
+            self, "Make outcode parquet per first letter"
+        )
+        alphabet = [chr(i) for i in range(ord("A"), ord("Z") + 1)]
+        for letter in alphabet:
+            context = current_ballots_joined_to_address_base.populated_with.context.copy()
+            context["first_letter"] = letter
+
+            parallel_outcodes.branch(
+                tasks.LambdaInvoke(
+                    self,
+                    f"Make outcode parquet for {letter}",
+                    lambda_function=to_outcode_parquet,
+                    payload=sfn.TaskInput.from_object(
+                        {
+                            "first_letter": letter,
+                            "source_bucket_name": current_ballots_joined_to_address_base.bucket.bucket_name,
+                            "source_path": current_ballots_joined_to_address_base.s3_prefix.format(
+                                dc_environment=self.dc_environment
+                            ),
+                            "dest_bucket_name": pollingstations_private_data.bucket_name,
+                            "dest_path": f"addressbase/{self.dc_environment}/current_elections_parquet",
+                        }
+                    ),
+                )
+            )
+        return parallel_outcodes
+
+    def make_parallel_first_letter_task(self) -> sfn.Parallel:
+        # Fan-out step (for each letter A-Z)
+        parallel_execution = sfn.Parallel(self, "Fan Out Letters")
+        alphabet = [chr(i) for i in range(ord("A"), ord("Z") + 1)]
+        for letter in alphabet:
+            context = current_ballots_joined_to_address_base.populated_with.context.copy()
+            context["first_letter"] = letter
+
+            parallel_execution.branch(
+                tasks.LambdaInvoke(
+                    self,
+                    f"Process {letter}",
+                    lambda_function=self.athena_query_lambda,
+                    payload=sfn.TaskInput.from_object(
+                        {
+                            "context": context,
+                            "QueryName": current_ballots_joined_to_address_base.populated_with.name,
+                            "blocking": True,
+                        }
+                    ),
+                )
+            )
+        return parallel_execution
