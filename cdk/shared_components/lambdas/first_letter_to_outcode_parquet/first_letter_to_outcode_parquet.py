@@ -75,6 +75,7 @@ def handler(event, context):
             print(
                 f"At least one UPRN in {outcode} has an election, writing an empty file"
             )
+            outcode_df.sort(by=["postcode", "uprn"])
             outcode_df.write_parquet(outcode_path)
         else:
             print(
