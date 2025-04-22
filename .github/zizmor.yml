@@ -1,0 +1,7 @@
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        actions/*: ref-pin
+        aws-actions/configure-aws-credentials: ref-pin
+        astral-sh/setup-uv: ref-pin
