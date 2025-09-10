@@ -2,7 +2,71 @@
 
 # DC Data Baker
 
-Orchestration for writing files to s3 to power our APIs
+This project is about _[denormalizing](
+https://en.wikipedia.org/wiki/Denormalization)_ data we hold into a format that 
+optimised for _read heavy queries_. 
+
+We know that we need to be able to scale up to a lot of traffic around large 
+elections.
+
+Doing, e.g a point-in-polygon query for every postcode search is 
+computationally expensive. This expense requires a complex deployment story 
+and ends up being risky, with the posibility that problems will only show up 
+when under high load. 
+
+To mitigate this, we convert the data into a flattened format. We call this 
+'baking'. This is a term we've [borrowed from 3D modelling](
+https://blender.stackexchange.com/questions/14416/what-does-baking-mean). We  gain query performance, with some trade-offs.
+
+Because 'baked' data isn't the full data model, we can't perform arbitrary 
+queries on the data. A 'baked' layer isn't a replacement for a relational 
+database.
+
+We also, in some case, sacrifice some referential integrity: baked data 
+might contain IDs to objects that don't actually exist. Client code needs to 
+deal with this.
+
+It might be useful to think of a baked layer as a materialised view: some 
+queries have been run to make a single table from a relational database. The 
+single table is easier to query than performing SQL joins each time.
+
+## Hash lookups
+
+Although baked data can be in more or less any shape, the main use-case is 
+for making a 'hash lookup' or mapping (not to be confused with geographical 
+maps) between addresses and other IDs.
+
+For example, rather than performing a spatial query to get the current 
+elections for each address, we can make a mapping file between each UPRN and 
+a list of ballot IDs for that UPRN. At query time we can then look up this 
+UPRN in the baked layer. Each ballot object can be loaded from a static 
+endpoint.
+
+In this instance, the mapping layer is a parquet file per outcode (the first 
+part of the postcode). A parquet file is a way to store tabular data that's 
+easy and fast to query. 
+
+## Layers
+
+When we talk about a 'baked layer' we're talking about a single dataset that 
+can typically only answer a single question. 
+
+Examples of layers that we might have are:
+
+- Current elections (UPRN to list of ballots)
+- Boundary reviews (UPRN to boundary reviews taking place)
+- List of organiations (UPRN to all layers of government for that point)
+- etc
+
+## Architecture 
+
+We use AWS Athena, AWS Lambda and AWS Step Functions to automate the 
+creation of each layer. 
+
+We've taken the decision to put logic inside Lambda functions written in 
+Python, even if there's a built-in AWS way to do the same thing. This is an 
+attempt to make each layer easier to understand for Python devs. Ideally 
+each layer should be understandable by reading the step function code. 
 
 ## What this makes
 
@@ -51,7 +115,7 @@ AWS_PROFILE=dev-aggregatorapi-dc DC_ENVIRONMENT=development cdk synth
 ```
 
 
-# Layers
+# Current layers
 
 The main concept in this repo is that of a 'layer'. This is really an
 artifact that is produced by code in this repo that can be use elsewhere.
