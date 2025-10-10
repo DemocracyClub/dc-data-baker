@@ -4,6 +4,7 @@ import os
 
 from aws_cdk import App, Environment, Tags
 from stacks.addressbase import AddressBaseStack
+from stacks.current_boundary_changes import CurrentBoundaryChangesStack
 from stacks.current_elections import CurrentElectionsStack
 from stacks.data_baker_core import DataBakerCoreStack
 
@@ -44,6 +45,12 @@ AddressBaseStack(
 CurrentElectionsStack(
     app,
     "CurrentElectionsStack",
+    env=env,
+)
+
+CurrentBoundaryChangesStack(
+    app,
+    "CurrentBoundaryChangesStack",
     env=env,
 )
 
