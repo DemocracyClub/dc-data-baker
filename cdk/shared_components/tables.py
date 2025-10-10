@@ -1,5 +1,6 @@
 import aws_cdk.aws_glue_alpha as glue
 from shared_components.buckets import (
+    data_baker_results_bucket,
     ee_data_cache_production,
     pollingstations_private_data,
 )
@@ -86,5 +87,53 @@ current_ballots_joined_to_address_base = GlueTable(
     populated_with=BaseQuery(
         name="uprn-to-ballots-first-letter.sql",
         context={"from_table": current_ballots.table_name},
+    ),
+)
+
+
+current_boundary_changes = GlueTable(
+    table_name="current_boundary_changes",
+    description="A list of boundary changes with a WKT",
+    s3_prefix="current_boundary_reviews-with-wkt/",
+    bucket=data_baker_results_bucket,
+    database=dc_data_baker,
+    data_format=glue.DataFormat.CSV,
+    columns={
+        "review_id": glue.Schema.STRING,
+        "slug": glue.Schema.STRING,
+        "status": glue.Schema.STRING,
+        "latest_event": glue.Schema.STRING,
+        "consultation_url": glue.Schema.STRING,
+        "legislation_title": glue.Schema.STRING,
+        "effective_date": glue.Schema.STRING,
+        "created": glue.Schema.STRING,
+        "modified": glue.Schema.STRING,
+        "common_name": glue.Schema.STRING,
+        "official_name": glue.Schema.STRING,
+        "organisation_gss": glue.Schema.STRING,
+        "organisation_boundary_wkt": glue.Schema.STRING,
+    },
+)
+
+current_boundary_changes_joined_to_address_base = GlueTable(
+    table_name="current_boundary_changes_joined_to_address_base",
+    description="A list of current boundary changes per UPRN",
+    s3_prefix="current_boundary_reviews-joined-to-addressbase/",
+    bucket=data_baker_results_bucket,
+    database=dc_data_baker,
+    data_format=glue.DataFormat.PARQUET,
+    columns={
+        "uprn": glue.Schema.STRING,
+        "address": glue.Schema.STRING,
+        "postcode": glue.Schema.STRING,
+        "addressbase_source": glue.Schema.STRING,
+        "boundary_review_ids": glue.Schema.array(
+            input_string="string", is_primitive=True
+        ),
+        "first_letter": glue.Schema.STRING,
+    },
+    populated_with=BaseQuery(
+        name="current-boundary-changes-to-addressbase.sql",
+        context={"from_table": current_boundary_changes.table_name},
     ),
 )
