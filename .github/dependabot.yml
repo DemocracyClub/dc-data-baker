@@ -4,6 +4,8 @@ updates:
     directory: "/requirements"
     schedule:
       interval: daily
+    cooldown:
+      default-days: 7
   - package-ecosystem: npm
     directory: "/"
     schedule:
@@ -13,7 +15,11 @@ updates:
       cdk-js-libs:
         patterns:
           - "*cdk*"
+    cooldown:
+      default-days: 7
   - package-ecosystem: "github-actions"
     directory: "/.github"
     schedule:
       interval: daily
+    cooldown:
+      default-days: 7
