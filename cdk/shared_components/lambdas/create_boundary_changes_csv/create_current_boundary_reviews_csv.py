@@ -37,7 +37,7 @@ def export_sql():
     LEFT JOIN organisations_organisation o ON o.id = obr.organisation_id
     LEFT JOIN organisations_organisationgeography og_main ON og_main.organisation_id = o.id
     LEFT JOIN organisations_organisationgeographysubdivided ogs ON ogs.organisation_geography_id = og_main.id
-    WHERE obr.status = 'CURRENT'
+    WHERE obr.id IN (963, 964)
     ORDER BY obr.created DESC, o.common_name;
 
     """
