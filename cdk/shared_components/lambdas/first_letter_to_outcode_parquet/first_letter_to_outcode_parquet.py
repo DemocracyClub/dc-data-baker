@@ -91,7 +91,7 @@ if __name__ == "__main__":
     event = {
         "first_letter": "G",
         "source_bucket_name": "dc-data-baker-results-bucket",
-        "source_path": "current_ballots_joined_to_address_base",
+        "source_path": "current_ballots_joined_to_address_base/",
         "dest_bucket_name": "dc-data-baker-results-bucket",
         "dest_path": "current_elections_parquet",
     }
