@@ -130,6 +130,7 @@ current_boundary_changes_joined_to_address_base = GlueTable(
         "boundary_review_ids": glue.Schema.array(
             input_string="string", is_primitive=True
         ),
+        "change_scenario": glue.Schema.STRING,  # TODO: use enum of changes
         "first_letter": glue.Schema.STRING,
     },
     populated_with=BaseQuery(
