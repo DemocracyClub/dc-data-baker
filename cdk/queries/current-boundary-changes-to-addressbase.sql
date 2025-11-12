@@ -4,6 +4,7 @@ UNLOAD (
 			results.postcode,
 			results.addressbase_source,
 			array_sort(filter(array_agg(DISTINCT results.review_id), x -> x IS NOT NULL)) AS boundary_review_ids,
+			'PLACEHOLDER' AS change_scenario, -- TODO: populate with actual change scenario
 			results.first_letter AS first_letter
 		FROM (
 				SELECT ab.uprn,
