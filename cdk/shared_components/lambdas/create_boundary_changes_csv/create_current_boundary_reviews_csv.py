@@ -19,28 +19,74 @@ db_password = password_response["Parameter"]["Value"]
 
 def export_sql():
     return """
+    WITH
+        review AS (
+            SELECT
+                obr.id AS review_id,
+                obr.slug,
+                obr.status,
+                obr.latest_event,
+                obr.consultation_url,
+                obr.legislation_title,
+                obr.effective_date,
+                obr.created AS review_created,
+                obr.modified AS review_modified,
+                o.common_name AS organisation_name,
+                o.official_name AS organisation_official_name,
+                og_main.gss AS organisation_gss,
+                obr.divisionset_id AS new_divisionset_id,
+                (
+                    SELECT
+                        ds.id
+                    FROM
+                        organisations_organisationdivisionset ds
+                    WHERE
+                        ds.organisation_id = o.id
+                    ORDER BY
+                        ds.end_date DESC NULLS LAST
+                    LIMIT
+                        1
+                ) AS old_divisionset_id
+            FROM
+                organisations_organisationboundaryreview obr
+                JOIN organisations_organisation o ON o.id = obr.organisation_id
+                JOIN organisations_organisationgeography og_main ON og_main.organisation_id = o.id
+            WHERE
+                obr.id IN (963, 964)
+        )
     SELECT
-        obr.id AS review_id,
-        obr.slug,
-        obr.status,
-        obr.latest_event,
-        obr.consultation_url,
-        obr.legislation_title,
-        obr.effective_date,
-        obr.created AS review_created,
-        obr.modified AS review_modified,
-        o.common_name AS organisation_name,
-        o.official_name AS organisation_official_name,
-        og_main.gss AS organisation_gss,
-        st_astext(ogs.geography) AS organisation_boundary_wkt
-    FROM organisations_organisationboundaryreview obr
-    LEFT JOIN organisations_organisation o ON o.id = obr.organisation_id
-    LEFT JOIN organisations_organisationgeography og_main ON og_main.organisation_id = o.id
-    LEFT JOIN organisations_organisationgeographysubdivided ogs ON ogs.organisation_geography_id = og_main.id
-    WHERE obr.id IN (963, 964)
-    ORDER BY obr.created DESC, o.common_name;
+        r.review_id,
+        r.slug,
+        r.status,
+        r.latest_event,
+        r.consultation_url,
+        r.legislation_title,
+        r.effective_date,
+        r.review_created,
+        r.review_modified,
+        r.organisation_name,
+        r.organisation_official_name,
+        r.organisation_gss,
+        ds.id AS divisionset_id,
+        CASE
+            WHEN ds.id = r.old_divisionset_id THEN 'old'
+            WHEN ds.id = r.new_divisionset_id THEN 'new'
+            ELSE NULL
+        END AS divisionset_generation,
+        d.division_type AS division_type,
+        CONCAT(d.divisionset_id, '-', d.slug) AS division_composite_id,
+        st_astext (dgs.geography) AS division_boundary_wkt
+    FROM
+        review r
+        JOIN organisations_organisationdivisionset ds ON ds.id IN (r.old_divisionset_id, r.new_divisionset_id)
+        JOIN organisations_organisationdivision d ON d.divisionset_id = ds.id
+        JOIN organisations_divisiongeography dg ON dg.division_id = d.id
+        JOIN organisations_divisiongeographysubdivided dgs ON dgs.division_geography_id = dg.id
+    ORDER BY
+        r.review_created DESC,
+        r.organisation_name;
 
-    """
+"""
 
 
 def handler(event, context):
