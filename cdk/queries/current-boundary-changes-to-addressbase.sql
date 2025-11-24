@@ -15,7 +15,7 @@ UNLOAD (
 					cbc.review_id
 				FROM addressbase_partitioned ab
 					LEFT JOIN current_boundary_changes cbc ON ST_CONTAINS(
-						ST_Polygon(cbc.organisation_boundary_wkt),
+						ST_Polygon(cbc.division_boundary_wkt),
 						ST_POINT(ab.longitude, ab.latitude)
 					)
 
