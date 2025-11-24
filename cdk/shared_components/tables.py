@@ -99,7 +99,6 @@ current_boundary_changes = GlueTable(
     database=dc_data_baker,
     data_format=glue.DataFormat.CSV,
     columns={
-        "review_id": glue.Schema.STRING,
         "slug": glue.Schema.STRING,
         "status": glue.Schema.STRING,
         "latest_event": glue.Schema.STRING,
@@ -112,11 +111,24 @@ current_boundary_changes = GlueTable(
         "organisation_official_name": glue.Schema.STRING,
         "organisation_gss": glue.Schema.STRING,
         "divisionset_id": glue.Schema.STRING,
-        "divisionset_generation": glue.Schema.STRING,
-        "division_type": glue.Schema.STRING,
+        "division_slug": glue.Schema.STRING,
         "division_composite_id": glue.Schema.STRING,
         "division_boundary_wkt": glue.Schema.STRING,
     },
+    partition_keys=[
+        glue.Column(
+            name="boundary_review_id",
+            type=glue.Schema.INTEGER,
+        ),
+        glue.Column(
+            name="divisionset_generation",
+            type=glue.Schema.STRING,
+        ),
+        glue.Column(
+            name="division_type",
+            type=glue.Schema.STRING,
+        ),
+    ],
 )
 
 current_boundary_changes_joined_to_address_base = GlueTable(
