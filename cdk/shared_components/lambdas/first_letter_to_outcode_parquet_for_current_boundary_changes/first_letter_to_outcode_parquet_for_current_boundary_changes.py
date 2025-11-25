@@ -48,38 +48,41 @@ def handler(event, context):
     first_letter_data = first_letter_data.with_columns(
         polars.col("postcode").str.split(" ").list.first().alias("outcode")
     )
-
     outcode_dfs = first_letter_data.partition_by("outcode")
 
-    expr_has_non_null_ballots = (
-        polars.col("ballot_ids")
+    expr_has_non_null_boundary_reviews = (
+        polars.col("boundary_review_ids")
         .list.eval(polars.element().is_not_null())
         .list.sum()
-        .alias("has_non_null_ballots")
+        .alias("has_non_null_boundary_reviews")
     )
 
     for outcode_df in outcode_dfs:
         outcode = outcode_df["outcode"][0]
         print(outcode)
 
-        has_any_non_null_ballots_df = outcode_df.select(
-            (expr_has_non_null_ballots > 0).any().alias("any_row_has_ballots")
+        has_any_non_null_boundary_reviews_df = outcode_df.select(
+            (expr_has_non_null_boundary_reviews > 0)
+            .any()
+            .alias("any_row_has_boundary_reviews")
         )
-        has_any_non_null_ballots = has_any_non_null_ballots_df[
-            "any_row_has_ballots"
-        ][0]  # Boolean True/False
+        has_any_non_null_boundary_reviews = (
+            has_any_non_null_boundary_reviews_df[
+                "any_row_has_boundary_reviews"
+            ][0]
+        )  # Boolean True/False
 
         outcode_path = BY_OUTCODE_PATH / f"{outcode}.parquet"
 
-        if has_any_non_null_ballots:
+        if has_any_non_null_boundary_reviews:
             print(
-                f"At least one UPRN in {outcode} has an election, writing an empty file"
+                f"At least one UPRN in {outcode} has an boundary review, writing an empty file"
             )
             outcode_df.sort(by=["postcode", "uprn"])
             outcode_df.write_parquet(outcode_path)
         else:
             print(
-                f"No ballot for any address in {outcode}, writing an empty file"
+                f"No boundary review for any address in {outcode}, writing an empty file"
             )
             polars.DataFrame().write_parquet(outcode_path)
         s3_client.upload_file(
@@ -91,9 +94,9 @@ if __name__ == "__main__":
     event = {
         "first_letter": "G",
         "source_bucket_name": "dc-data-baker-results-bucket",
-        "source_path": "current_ballots_joined_to_address_base/",
+        "source_path": "current_boundary_reviews-joined-to-addressbase/",
         "dest_bucket_name": "dc-data-baker-results-bucket",
-        "dest_path": "current_elections_parquet",
+        "dest_path": "current_boundary_reviews_parquet",
     }
     print(event)
     handler(event, {})
