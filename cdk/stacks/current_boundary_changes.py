@@ -51,7 +51,14 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             self.make_current_boundary_changes_csv_task()
         )
 
-        make_partitions = self.make_partitions_task()
+        make_current_boundary_changes_partitions = self.make_partitions_task(
+            current_boundary_changes
+        )
+        make_current_boundary_changes_joined_to_address_base_partitions = (
+            self.make_partitions_task(
+                current_boundary_changes_joined_to_address_base
+            )
+        )
 
         parallel_first_letter_task = self.make_parallel_first_letter_task()
 
@@ -61,8 +68,11 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             delete_old_current_boundary_changes_joined_to_address_base_task.next(
                 create_current_boundary_changes_csv_task
             )
+            .next(make_current_boundary_changes_partitions)
             .next(parallel_first_letter_task)
-            .next(make_partitions)
+            .next(
+                make_current_boundary_changes_joined_to_address_base_partitions
+            )
             .next(parallel_outcodes_task)
         )
 
@@ -155,16 +165,14 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             )
         return parallel_execution
 
-    def make_partitions_task(self) -> tasks.LambdaInvoke:
+    def make_partitions_task(self, table) -> tasks.LambdaInvoke:
         return tasks.LambdaInvoke(
             self,
-            "Make partitions",
+            f"Make partitions for {table.table_name}",
             lambda_function=self.athena_query_lambda,
             payload=sfn.TaskInput.from_object(
                 {
-                    "context": {
-                        "table_name": current_boundary_changes_joined_to_address_base.table_name
-                    },
+                    "context": {"table_name": table.table_name},
                     "QueryString": "MSCK REPAIR TABLE `$table_name`;",
                     "blocking": True,
                 }
