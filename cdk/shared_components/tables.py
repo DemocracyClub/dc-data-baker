@@ -131,6 +131,33 @@ current_boundary_changes = GlueTable(
     ],
 )
 
+addresses_to_boundary_change = GlueTable(
+    table_name="addresses_to_boundary_change",
+    description="Address to single boundary change",
+    s3_prefix="addresses_to_boundary_change/",
+    bucket=data_baker_results_bucket,
+    database=dc_data_baker,
+    data_format=glue.DataFormat.PARQUET,
+    columns={
+        "uprn": glue.Schema.STRING,
+        "address": glue.Schema.STRING,
+        "postcode": glue.Schema.STRING,
+        "addressbase_source": glue.Schema.STRING,
+        "division_type": glue.Schema.STRING,
+        "boundary_review_id": glue.Schema.INTEGER,
+        "boundary_change_details": glue.Schema.map(
+            glue.Schema.STRING,
+            input_string="string",
+            is_primitive=True,
+        ),
+    },
+    populated_with=BaseQuery(
+        name="addresses_to_boundary_change.sql",
+        context={},
+    ),
+)
+
+
 current_boundary_changes_joined_to_address_base = GlueTable(
     table_name="current_boundary_changes_joined_to_address_base",
     description="A list of current boundary changes per UPRN",
