@@ -9,8 +9,8 @@ from aws_cdk import aws_stepfunctions as sfn
 from aws_cdk import aws_stepfunctions_tasks as tasks
 from constructs import Construct
 from shared_components.buckets import data_baker_results_bucket
-from shared_components.constructs.row_count_check_construct import (
-    RowCountCheckConstruct,
+from shared_components.constructs.addressbase_data_quality_check_construct import (
+    AddressbaseDataQualityCheckConstruct,
 )
 from shared_components.models import GlueTable, S3Bucket
 from shared_components.tables import (
@@ -80,9 +80,9 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             )
         )
 
-        row_count_check = RowCountCheckConstruct(
+        data_quality_checks = AddressbaseDataQualityCheckConstruct(
             self,
-            "CheckRowCounts",
+            "AddressbaseDataQualityChecks",
             athena_query_lambda=self.athena_query_lambda,
             source_table_name=addressbase_partitioned.table_name,
             target_table_name=current_boundary_reviews_joined_to_addressbase.table_name,
@@ -102,7 +102,7 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             .next(
                 make_current_boundary_reviews_joined_to_addressbase_partitions
             )
-            .next(row_count_check.entry_point)
+            .next(data_quality_checks.entry_point)
         )
 
         self.step_function = sfn.StateMachine(
