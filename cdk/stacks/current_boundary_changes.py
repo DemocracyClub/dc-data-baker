@@ -11,6 +11,7 @@ from constructs import Construct
 from shared_components.buckets import data_baker_results_bucket
 from shared_components.models import GlueTable, S3Bucket
 from shared_components.tables import (
+    addresses_to_boundary_change,
     current_boundary_changes,
 )
 from stacks.base_stack import DataBakerStack
@@ -56,12 +57,14 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             current_boundary_changes
         )
 
+        boundary_review_pairs_map = self.make_boundary_review_pairs_map()
 
         main_tasks = (
             delete_old_current_boundary_changes_task.next(
                 create_current_boundary_changes_csv_task
             )
             .next(make_current_boundary_changes_partitions)
+            .next(boundary_review_pairs_map)
         )
 
         self.step_function = sfn.StateMachine(
@@ -143,8 +146,104 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             ),
         )
 
+    def make_boundary_review_pairs_map(self) -> sfn.Chain:
+        """
+        Creates a workflow that:
+        1. Deletes old data from addresses_to_boundary_change table
+        2. Queries for unique boundary_review_id and division_type pairs
+        3. Gets the query results
+        4. Maps over each pair to run the addresses_to_boundary_change query
+        """
+        # Delete old data
+        delete_old_addresses_to_boundary_change = tasks.LambdaInvoke(
             self,
+            "Remove old addresses_to_boundary_change data from S3",
+            lambda_function=self.empty_bucket_by_prefix_lambda,
+            payload=sfn.TaskInput.from_object(
+                {
+                    "bucket": addresses_to_boundary_change.bucket.bucket_name,
+                    "prefix": addresses_to_boundary_change.s3_prefix,
+                }
+            ),
         )
 
+        # Query for unique pairs
+        get_unique_pairs = tasks.LambdaInvoke(
+            self,
+            "start query to get unique boundary review / division type pairs",
+            lambda_function=self.athena_query_lambda,
+            payload=sfn.TaskInput.from_object(
+                {
+                    "context": {
+                        "table_name": current_boundary_changes.table_name
+                    },
+                    "QueryString": """
+                        SELECT DISTINCT
+                            boundary_review_id,
+                            division_type
+                        FROM {table_name}
+                        ORDER BY boundary_review_id, division_type
+                    """,
+                    "blocking": True,
+                }
+            ),
         )
 
+        # Get the query results
+        get_pairs_results = tasks.AthenaGetQueryResults(
+            self,
+            "Get unique BR/DT pairs results",
+            query_language=sfn.QueryLanguage.JSONATA,
+            query_execution_id="{% $states.input.Payload.queryExecutionId %}",
+        )
+
+        # Extract just the rows (skip header) to simplify downstream processing
+        transform_results = sfn.Pass(
+            self,
+            "Drop header from unique BR/DT pairs",
+            parameters={
+                "pairs": sfn.JsonPath.string_at("$.ResultSet.Rows[1:]"),
+            },
+        )
+
+        # Map task - process each pair
+        # Each item will be a row from Athena: {"Data": [{"VarCharValue": "963"}, {"VarCharValue": "WAC"}]}
+        # Pass it to the lambda that can run the athena query that populates 'addresses_to_boundary_change' table
+        process_pair_task = tasks.LambdaInvoke(
+            self,
+            "Create Address to Boundary Review for Review/Division Type pair",
+            lambda_function=self.athena_query_lambda,
+            payload=sfn.TaskInput.from_object(
+                {
+                    "context": {
+                        "boundary_review_id": sfn.JsonPath.string_at(
+                            "$.Data[0].VarCharValue"
+                        ),
+                        "division_type": sfn.JsonPath.string_at(
+                            "$.Data[1].VarCharValue"
+                        ),
+                    },
+                    "QueryName": addresses_to_boundary_change.populated_with.name,
+                    "blocking": True,
+                }
+            ),
+        )
+
+        map_state = sfn.Map(
+            self,
+            "Create Address to Boundary Review for each pair",
+            items_path="$.pairs",
+            max_concurrency=5,
+        )
+        map_state.item_processor(
+            process_pair_task, mode=sfn.ProcessorMode.INLINE
+        )
+
+        # Chain the states together
+        return (
+            sfn.Chain.start(delete_old_addresses_to_boundary_change)
+            .next(get_unique_pairs)
+            .next(get_pairs_results)
+            .next(transform_results)
+            .next(map_state)
+        )
