@@ -158,8 +158,8 @@ addresses_to_boundary_change = GlueTable(
 )
 
 
-current_boundary_changes_joined_to_address_base = GlueTable(
-    table_name="current_boundary_changes_joined_to_address_base",
+current_boundary_reviews_joined_to_addressbase = GlueTable(
+    table_name="current_boundary_reviews_joined_to_addressbase",
     description="A list of current boundary changes per UPRN",
     s3_prefix="current_boundary_reviews-joined-to-addressbase/",
     bucket=data_baker_results_bucket,
@@ -170,10 +170,11 @@ current_boundary_changes_joined_to_address_base = GlueTable(
         "address": glue.Schema.STRING,
         "postcode": glue.Schema.STRING,
         "addressbase_source": glue.Schema.STRING,
-        "boundary_review_ids": glue.Schema.array(
-            input_string="string", is_primitive=True
+        "boundary_review_ids": glue.Schema.map(
+            glue.Schema.INTEGER,
+            input_string="map<string,map<string,string>>",
+            is_primitive=False,
         ),
-        "change_scenario": glue.Schema.STRING,  # TODO: use enum of changes
         "first_letter": glue.Schema.STRING,
     },
     populated_with=BaseQuery(

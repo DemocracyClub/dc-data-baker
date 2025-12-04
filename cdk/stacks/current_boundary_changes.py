@@ -13,6 +13,7 @@ from shared_components.models import GlueTable, S3Bucket
 from shared_components.tables import (
     addresses_to_boundary_change,
     current_boundary_changes,
+    current_boundary_reviews_joined_to_addressbase,
 )
 from stacks.base_stack import DataBakerStack
 
@@ -84,6 +85,7 @@ class CurrentBoundaryChangesStack(DataBakerStack):
         return [
             current_boundary_changes,
             addresses_to_boundary_change,
+            current_boundary_reviews_joined_to_addressbase,
         ]
 
     def make_delete_old_current_boundary_changes_task(
