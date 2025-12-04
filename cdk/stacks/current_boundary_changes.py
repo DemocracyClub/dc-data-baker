@@ -60,12 +60,36 @@ class CurrentBoundaryChangesStack(DataBakerStack):
 
         boundary_review_pairs_map = self.make_boundary_review_pairs_map()
 
+        make_addresses_to_boundary_change_partitions = (
+            self.make_partitions_task(addresses_to_boundary_change)
+        )
+
+        delete_old_current_boundary_reviews_joined_to_addressbase_task = self.make_delete_old_current_boundary_reviews_joined_to_addressbase_task()
+
+        make_current_boundary_reviews_joined_to_addressbase_task = (
+            self.make_current_boundary_reviews_joined_to_addressbase_task()
+        )
+
+        make_current_boundary_reviews_joined_to_addressbase_partitions = (
+            self.make_partitions_task(
+                current_boundary_reviews_joined_to_addressbase
+            )
+        )
+
         main_tasks = (
             delete_old_current_boundary_changes_task.next(
                 create_current_boundary_changes_csv_task
             )
             .next(make_current_boundary_changes_partitions)
             .next(boundary_review_pairs_map)
+            .next(make_addresses_to_boundary_change_partitions)
+            .next(
+                delete_old_current_boundary_reviews_joined_to_addressbase_task
+            )
+            .next(make_current_boundary_reviews_joined_to_addressbase_task)
+            .next(
+                make_current_boundary_reviews_joined_to_addressbase_partitions
+            )
         )
 
         self.step_function = sfn.StateMachine(
@@ -248,4 +272,35 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             .next(get_pairs_results)
             .next(transform_results)
             .next(map_state)
+        )
+
+    def make_delete_old_current_boundary_reviews_joined_to_addressbase_task(
+        self,
+    ) -> tasks.LambdaInvoke:
+        return tasks.LambdaInvoke(
+            self,
+            "Remove old current_boundary_reviews_joined_to_addressbase data from S3",
+            lambda_function=self.empty_bucket_by_prefix_lambda,
+            payload=sfn.TaskInput.from_object(
+                {
+                    "bucket": current_boundary_reviews_joined_to_addressbase.bucket.bucket_name,
+                    "prefix": current_boundary_reviews_joined_to_addressbase.s3_prefix,
+                }
+            ),
+        )
+
+    def make_current_boundary_reviews_joined_to_addressbase_task(
+        self,
+    ) -> tasks.LambdaInvoke:
+        return tasks.LambdaInvoke(
+            self,
+            "Create current_boundary_reviews_joined_to_addressbase",
+            lambda_function=self.athena_query_lambda,
+            payload=sfn.TaskInput.from_object(
+                {
+                    "context": current_boundary_reviews_joined_to_addressbase.populated_with.context.copy(),
+                    "QueryName": current_boundary_reviews_joined_to_addressbase.populated_with.name,
+                    "blocking": True,
+                }
+            ),
         )
