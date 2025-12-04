@@ -12,7 +12,6 @@ from shared_components.buckets import data_baker_results_bucket
 from shared_components.models import GlueTable, S3Bucket
 from shared_components.tables import (
     current_boundary_changes,
-    current_boundary_changes_joined_to_address_base,
 )
 from stacks.base_stack import DataBakerStack
 
@@ -45,7 +44,9 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             )
         )
 
-        delete_old_current_boundary_changes_joined_to_address_base_task = self.make_delete_old_current_boundary_changes_joined_to_address_base_task()
+        delete_old_current_boundary_changes_task = (
+            self.make_delete_old_current_boundary_changes_task()
+        )
 
         create_current_boundary_changes_csv_task = (
             self.make_current_boundary_changes_csv_task()
@@ -54,26 +55,13 @@ class CurrentBoundaryChangesStack(DataBakerStack):
         make_current_boundary_changes_partitions = self.make_partitions_task(
             current_boundary_changes
         )
-        make_current_boundary_changes_joined_to_address_base_partitions = (
-            self.make_partitions_task(
-                current_boundary_changes_joined_to_address_base
-            )
-        )
 
-        parallel_first_letter_task = self.make_parallel_first_letter_task()
-
-        parallel_outcodes_task = self.make_parallel_outcodes_task()
 
         main_tasks = (
-            delete_old_current_boundary_changes_joined_to_address_base_task.next(
+            delete_old_current_boundary_changes_task.next(
                 create_current_boundary_changes_csv_task
             )
             .next(make_current_boundary_changes_partitions)
-            .next(parallel_first_letter_task)
-            .next(
-                make_current_boundary_changes_joined_to_address_base_partitions
-            )
-            .next(parallel_outcodes_task)
         )
 
         self.step_function = sfn.StateMachine(
@@ -92,10 +80,10 @@ class CurrentBoundaryChangesStack(DataBakerStack):
     def glue_tables() -> List[GlueTable]:
         return [
             current_boundary_changes,
-            current_boundary_changes_joined_to_address_base,
+            addresses_to_boundary_change,
         ]
 
-    def make_delete_old_current_boundary_changes_joined_to_address_base_task(
+    def make_delete_old_current_boundary_changes_task(
         self,
     ) -> tasks.LambdaInvoke:
         return tasks.LambdaInvoke(
@@ -104,8 +92,8 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             lambda_function=self.empty_bucket_by_prefix_lambda,
             payload=sfn.TaskInput.from_object(
                 {
-                    "bucket": current_boundary_changes_joined_to_address_base.bucket.bucket_name,
-                    "prefix": current_boundary_changes_joined_to_address_base.s3_prefix.format(
+                    "bucket": current_boundary_changes.bucket.bucket_name,
+                    "prefix": current_boundary_changes.s3_prefix.format(
                         **self.context
                     ),
                 }
@@ -141,30 +129,6 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             lambda_function=create_current_boundary_changes_csv_function,
         )
 
-    def make_parallel_first_letter_task(self) -> sfn.Parallel:
-        # Fan-out step (for each letter A-Z)
-        parallel_execution = sfn.Parallel(self, "Fan Out Letters")
-        alphabet = [chr(i) for i in range(ord("A"), ord("Z") + 1)]
-        for letter in alphabet:
-            context = current_boundary_changes_joined_to_address_base.populated_with.context.copy()
-            context["first_letter"] = letter
-
-            parallel_execution.branch(
-                tasks.LambdaInvoke(
-                    self,
-                    f"Process {letter}",
-                    lambda_function=self.athena_query_lambda,
-                    payload=sfn.TaskInput.from_object(
-                        {
-                            "context": context,
-                            "QueryName": current_boundary_changes_joined_to_address_base.populated_with.name,
-                            "blocking": True,
-                        }
-                    ),
-                )
-            )
-        return parallel_execution
-
     def make_partitions_task(self, table) -> tasks.LambdaInvoke:
         return tasks.LambdaInvoke(
             self,
@@ -179,58 +143,8 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             ),
         )
 
-    def make_parallel_outcodes_task(self) -> sfn.Parallel:
-        to_outcode_parquet = self.make_to_outcode_parquet_task()
-        parallel_outcodes = sfn.Parallel(
-            self, "Make outcode parquet per first letter"
-        )
-        alphabet = [chr(i) for i in range(ord("A"), ord("Z") + 1)]
-        for letter in alphabet:
-            context = current_boundary_changes_joined_to_address_base.populated_with.context.copy()
-            context["first_letter"] = letter
-
-            parallel_outcodes.branch(
-                tasks.LambdaInvoke(
-                    self,
-                    f"Make outcode parquet for {letter}",
-                    lambda_function=to_outcode_parquet,
-                    payload=sfn.TaskInput.from_object(
-                        {
-                            "first_letter": letter,
-                            "source_bucket_name": current_boundary_changes_joined_to_address_base.bucket.bucket_name,
-                            "source_path": current_boundary_changes_joined_to_address_base.s3_prefix.format(
-                                dc_environment=self.dc_environment
-                            ),
-                            "dest_bucket_name": data_baker_results_bucket.bucket_name,
-                            "dest_path": "current_boundary_reviews_parquet",
-                        }
-                    ),
-                )
-            )
-        return parallel_outcodes
-
-    def make_to_outcode_parquet_task(self) -> tasks.LambdaInvoke:
-        to_outcode_parquet = aws_lambda_python.PythonFunction(
             self,
-            "first_letter_to_outcode_parquet_for_current_boundary_changes",
-            function_name="first_letter_to_outcode_parquet_for_current_boundary_changes",
-            runtime=aws_lambda.Runtime.PYTHON_3_12,
-            handler="handler",
-            entry="cdk/shared_components/lambdas/first_letter_to_outcode_parquet_for_current_boundary_changes/",
-            index="first_letter_to_outcode_parquet_for_current_boundary_changes.py",
-            timeout=Duration.seconds(900),
-            memory_size=2048,
         )
 
-        to_outcode_parquet.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "athena:*",
-                    "s3:*",
-                    "glue:*",
-                ],
-                resources=["*"],
-            )
         )
 
-        return to_outcode_parquet
