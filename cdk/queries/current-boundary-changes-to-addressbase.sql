@@ -1,33 +1,39 @@
 UNLOAD (
-		SELECT results.uprn,
-			results.address,
-			results.postcode,
-			results.addressbase_source,
-			array_sort(filter(array_agg(DISTINCT results.boundary_review_id), x -> x IS NOT NULL)) AS boundary_review_ids,
-			'PLACEHOLDER' AS change_scenario, -- TODO: populate with actual change scenario
-			results.first_letter AS first_letter
-		FROM (
-				SELECT ab.uprn,
-					ab.address,
-					ab.postcode,
-					ab.first_letter,
-					ab.addressbase_source,
-					cbc.boundary_review_id
-				FROM addressbase_partitioned ab
-					LEFT JOIN current_boundary_changes cbc ON ST_CONTAINS(
-						ST_Polygon(cbc.division_boundary_wkt),
-						ST_POINT(ab.longitude, ab.latitude)
-					)
-
-				WHERE ab.first_letter = '{first_letter}'
-			) AS results
-		GROUP BY results.uprn,
-			results.address,
-			results.postcode,
-			results.addressbase_source,
-			results.first_letter
-	) TO '$table_full_s3_path' WITH (
-		format = 'PARQUET',
-		compression = 'SNAPPY',
-		partitioned_by = ARRAY [ 'first_letter' ]
+	WITH all_addresses AS (
+		SELECT
+			uprn,
+			address,
+			postcode,
+			first_letter,
+			addressbase_source
+		FROM addressbase_partitioned
+	),
+	grouped_by_review AS (
+		SELECT
+			uprn,
+			boundary_review_id,
+			map_agg(division_type, boundary_change_details) AS division_map
+		FROM addresses_to_boundary_change
+		GROUP BY uprn, boundary_review_id
+	),
+	aggregated_reviews AS (
+		SELECT
+			uprn,
+			map_agg(boundary_review_id, division_map) AS boundary_review_ids
+		FROM grouped_by_review
+		GROUP BY uprn
 	)
+	SELECT
+		aa.uprn,
+		aa.address,
+		aa.postcode,
+		aa.addressbase_source,
+		COALESCE(ar.boundary_review_ids, MAP()) AS boundary_review_ids,
+		aa.first_letter
+	FROM all_addresses aa
+	LEFT JOIN aggregated_reviews ar ON aa.uprn = ar.uprn
+) TO '$table_full_s3_path' WITH (
+	format = 'PARQUET',
+	compression = 'SNAPPY',
+	partitioned_by = ARRAY [ 'first_letter' ]
+)
