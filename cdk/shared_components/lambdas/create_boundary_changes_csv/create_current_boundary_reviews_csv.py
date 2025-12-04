@@ -33,7 +33,7 @@ def export_sql():
                 obr.modified AS review_modified,
                 o.common_name AS organisation_name,
                 o.official_name AS organisation_official_name,
-                og_main.gss AS organisation_gss,
+                og.gss AS organisation_gss,
                 obr.divisionset_id AS new_divisionset_id,
                 (
                     SELECT
@@ -50,7 +50,7 @@ def export_sql():
             FROM
                 organisations_organisationboundaryreview obr
                 JOIN organisations_organisation o ON o.id = obr.organisation_id
-                JOIN organisations_organisationgeography og_main ON og_main.organisation_id = o.id
+                JOIN organisations_organisationgeography og ON og.organisation_id = o.id
             WHERE
                 obr.id IN (963, 964)
         )
