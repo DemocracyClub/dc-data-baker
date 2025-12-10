@@ -12,6 +12,9 @@ from shared_components.buckets import data_baker_results_bucket
 from shared_components.constructs.addressbase_data_quality_check_construct import (
     AddressbaseDataQualityCheckConstruct,
 )
+from shared_components.constructs.make_partitions_construct import (
+    MakePartitionsConstruct,
+)
 from shared_components.models import GlueTable, S3Bucket
 from shared_components.tables import (
     addressbase_partitioned,
@@ -172,18 +175,12 @@ class CurrentBoundaryChangesStack(DataBakerStack):
         )
 
     def make_partitions_task(self, table) -> tasks.LambdaInvoke:
-        return tasks.LambdaInvoke(
+        return MakePartitionsConstruct(
             self,
-            f"Make partitions for {table.table_name}",
-            lambda_function=self.athena_query_lambda,
-            payload=sfn.TaskInput.from_object(
-                {
-                    "context": {"table_name": table.table_name},
-                    "QueryString": "MSCK REPAIR TABLE `$table_name`;",
-                    "blocking": True,
-                }
-            ),
-        )
+            f"MakePartitionsConstructFor{table.table_name}",
+            athena_query_lambda=self.athena_query_lambda,
+            target_table_name=table.table_name,
+        ).entry_point
 
     def make_boundary_review_pairs_map(self) -> sfn.Chain:
         """
