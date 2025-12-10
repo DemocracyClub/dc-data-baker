@@ -23,6 +23,9 @@ from shared_components.buckets import (
 from shared_components.constructs.addressbase_source_check_construct import (
     AddressBaseSourceCheckConstruct,
 )
+from shared_components.constructs.make_partitions_construct import (
+    MakePartitionsConstruct,
+)
 from shared_components.databases import dc_data_baker
 from shared_components.models import GlueTable, S3Bucket
 from shared_components.tables import (
@@ -103,20 +106,12 @@ class AddressBaseStack(DataBakerStack):
             query_language=sfn.QueryLanguage.JSONATA,
         )
 
-        make_partitions = tasks.LambdaInvoke(
+        make_partitions = MakePartitionsConstruct(
             self,
-            "Make partitions",
-            lambda_function=self.athena_query_lambda,
-            payload=sfn.TaskInput.from_object(
-                {
-                    "context": {
-                        "table_name": addressbase_partitioned.table_name
-                    },
-                    "QueryString": "MSCK REPAIR TABLE `{table_name}`;",
-                    "blocking": True,
-                }
-            ),
-        )
+            f"Make partitions for {addressbase_partitioned.table_name}",
+            athena_query_lambda=self.athena_query_lambda,
+            target_table_name=addressbase_partitioned.table_name,
+        ).entry_point
 
         addressbase_check = AddressBaseSourceCheckConstruct(
             self,

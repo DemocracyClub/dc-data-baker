@@ -40,6 +40,9 @@ from shared_components.buckets import (
 from shared_components.constructs.addressbase_source_check_construct import (
     AddressBaseSourceCheckConstruct,
 )
+from shared_components.constructs.make_partitions_construct import (
+    MakePartitionsConstruct,
+)
 from shared_components.models import GlueTable, S3Bucket
 from shared_components.tables import (
     current_ballots,
@@ -82,7 +85,9 @@ class CurrentElectionsStack(DataBakerStack):
 
         parallel_first_letter_task = self.make_parallel_first_letter_task()
 
-        make_partitions = self.make_partitions_task()
+        make_partitions = self.make_partitions_task(
+            current_ballots_joined_to_address_base
+        )
 
         # Fan-out step (for each letter A-Z)
         parallel_outcodes_task = self.make_parallel_outcodes_task()
@@ -293,21 +298,13 @@ class CurrentElectionsStack(DataBakerStack):
             ),
         )
 
-    def make_partitions_task(self) -> tasks.LambdaInvoke:
-        return tasks.LambdaInvoke(
+    def make_partitions_task(self, table) -> tasks.LambdaInvoke:
+        return MakePartitionsConstruct(
             self,
-            "Make partitions",
-            lambda_function=self.athena_query_lambda,
-            payload=sfn.TaskInput.from_object(
-                {
-                    "context": {
-                        "table_name": current_ballots_joined_to_address_base.table_name
-                    },
-                    "QueryString": "MSCK REPAIR TABLE `$table_name`;",
-                    "blocking": True,
-                }
-            ),
-        )
+            f"Make partitions For{table.table_name}",
+            athena_query_lambda=self.athena_query_lambda,
+            target_table_name=table.table_name,
+        ).entry_point
 
     def make_to_outcode_parquet_task(self) -> tasks.LambdaInvoke:
         to_outcode_parquet = aws_lambda_python.PythonFunction(
