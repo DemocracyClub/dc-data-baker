@@ -356,6 +356,7 @@ class CurrentElectionsStack(DataBakerStack):
                             ),
                             "dest_bucket_name": pollingstations_private_data.bucket_name,
                             "dest_path": f"addressbase/{self.dc_environment}/current_elections_parquet",
+                            "filter_column": "ballot_ids",
                         }
                     ),
                 )
