@@ -175,8 +175,13 @@ current_boundary_reviews_joined_to_addressbase = GlueTable(
             input_string="map<string,map<string,string>>",
             is_primitive=False,
         ),
-        "first_letter": glue.Schema.STRING,
     },
+    partition_keys=[
+        glue.Column(
+            name="first_letter",
+            type=glue.Schema.STRING,
+        )
+    ],
     populated_with=BaseQuery(
         name="current-boundary-changes-to-addressbase.sql",
         context={"from_table": current_boundary_changes.table_name},
