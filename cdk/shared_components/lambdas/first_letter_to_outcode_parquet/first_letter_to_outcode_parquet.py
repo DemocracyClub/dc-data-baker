@@ -14,6 +14,7 @@ def handler(event, context):
     source_path = event["source_path"]
     dest_bucket_name = event["dest_bucket_name"]
     dest_path = event["dest_path"]
+    filter_column = event["filter_column"]
 
     prefix = f"{source_path}first_letter={first_letter}"
 
@@ -51,35 +52,37 @@ def handler(event, context):
 
     outcode_dfs = first_letter_data.partition_by("outcode")
 
-    expr_has_non_null_ballots = (
-        polars.col("ballot_ids")
+    expr_has_non_null_filter_column = (
+        polars.col(filter_column)
         .list.eval(polars.element().is_not_null())
         .list.sum()
-        .alias("has_non_null_ballots")
+        .alias(f"has_non_null_{filter_column}")
     )
 
     for outcode_df in outcode_dfs:
         outcode = outcode_df["outcode"][0]
         print(outcode)
 
-        has_any_non_null_ballots_df = outcode_df.select(
-            (expr_has_non_null_ballots > 0).any().alias("any_row_has_ballots")
+        has_any_non_null_filter_column_df = outcode_df.select(
+            (expr_has_non_null_filter_column > 0)
+            .any()
+            .alias(f"any_row_has_{filter_column}")
         )
-        has_any_non_null_ballots = has_any_non_null_ballots_df[
-            "any_row_has_ballots"
+        has_any_non_null_filter_column = has_any_non_null_filter_column_df[
+            f"any_row_has_{filter_column}"
         ][0]  # Boolean True/False
 
         outcode_path = BY_OUTCODE_PATH / f"{outcode}.parquet"
 
-        if has_any_non_null_ballots:
+        if has_any_non_null_filter_column:
             print(
-                f"At least one UPRN in {outcode} has an election, writing an empty file"
+                f"At least one UPRN in {outcode} has data in {filter_column}, writing a file with data"
             )
             outcode_df.sort(by=["postcode", "uprn"])
             outcode_df.write_parquet(outcode_path)
         else:
             print(
-                f"No ballot for any address in {outcode}, writing an empty file"
+                f"No {filter_column} for any address in {outcode}, writing an empty file"
             )
             polars.DataFrame().write_parquet(outcode_path)
         s3_client.upload_file(
@@ -93,7 +96,8 @@ if __name__ == "__main__":
         "source_bucket_name": "dc-data-baker-results-bucket",
         "source_path": "current_ballots_joined_to_address_base/",
         "dest_bucket_name": "dc-data-baker-results-bucket",
-        "dest_path": "current_elections_parquet",
+        "dest_path": "current_election_parquet",
+        "filter_column": "ballot_ids",
     }
     print(event)
     handler(event, {})
