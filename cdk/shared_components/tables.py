@@ -1,5 +1,6 @@
 import aws_cdk.aws_glue_alpha as glue
 from shared_components.buckets import (
+    data_baker_results_bucket,
     ee_data_cache_production,
     pollingstations_private_data,
 )
@@ -87,4 +88,123 @@ current_ballots_joined_to_address_base = GlueTable(
         name="uprn-to-ballots-first-letter.sql",
         context={"from_table": current_ballots.table_name},
     ),
+)
+
+
+current_boundary_changes = GlueTable(
+    table_name="current_boundary_changes",
+    description="A list of boundary changes with a WKT",
+    s3_prefix="current_boundary_reviews_with_wkt",
+    bucket=data_baker_results_bucket,
+    database=dc_data_baker,
+    data_format=glue.DataFormat.CSV,
+    columns={
+        "slug": glue.Schema.STRING,
+        "status": glue.Schema.STRING,
+        "latest_event": glue.Schema.STRING,
+        "consultation_url": glue.Schema.STRING,
+        "legislation_title": glue.Schema.STRING,
+        "effective_date": glue.Schema.STRING,
+        "review_created": glue.Schema.STRING,
+        "review_modified": glue.Schema.STRING,
+        "organisation_name": glue.Schema.STRING,
+        "organisation_official_name": glue.Schema.STRING,
+        "organisation_gss": glue.Schema.STRING,
+        "divisionset_id": glue.Schema.STRING,
+        "division_slug": glue.Schema.STRING,
+        "division_composite_id": glue.Schema.STRING,
+        "division_boundary_wkt": glue.Schema.STRING,
+    },
+    partition_keys=[
+        glue.Column(
+            name="boundary_review_id",
+            type=glue.Schema.INTEGER,
+        ),
+        glue.Column(
+            name="divisionset_generation",
+            type=glue.Schema.STRING,
+        ),
+        glue.Column(
+            name="division_type",
+            type=glue.Schema.STRING,
+        ),
+    ],
+)
+
+addresses_to_boundary_change = GlueTable(
+    table_name="addresses_to_boundary_change",
+    description="Address to single boundary change",
+    s3_prefix="addresses_to_boundary_change/",
+    bucket=data_baker_results_bucket,
+    database=dc_data_baker,
+    data_format=glue.DataFormat.PARQUET,
+    columns={
+        "uprn": glue.Schema.STRING,
+        "address": glue.Schema.STRING,
+        "postcode": glue.Schema.STRING,
+        "addressbase_source": glue.Schema.STRING,
+        "division_type": glue.Schema.STRING,
+        "boundary_review_id": glue.Schema.INTEGER,
+        "boundary_change_details": glue.Schema.map(
+            glue.Schema.STRING,
+            input_string="string",
+            is_primitive=True,
+        ),
+    },
+    populated_with=BaseQuery(
+        name="addresses_to_boundary_change.sql",
+        context={},
+    ),
+)
+
+
+current_boundary_reviews_joined_to_addressbase = GlueTable(
+    table_name="current_boundary_reviews_joined_to_addressbase",
+    description="A list of current boundary changes per UPRN",
+    s3_prefix="current_boundary_reviews_joined_to_addressbase/",
+    bucket=data_baker_results_bucket,
+    database=dc_data_baker,
+    data_format=glue.DataFormat.PARQUET,
+    columns={
+        "uprn": glue.Schema.STRING,
+        "address": glue.Schema.STRING,
+        "postcode": glue.Schema.STRING,
+        "addressbase_source": glue.Schema.STRING,
+        "boundary_review_ids": glue.Schema.map(
+            glue.Schema.INTEGER,
+            input_string="map<string,map<string,string>>",
+            is_primitive=False,
+        ),
+    },
+    partition_keys=[
+        glue.Column(
+            name="first_letter",
+            type=glue.Schema.STRING,
+        )
+    ],
+    populated_with=BaseQuery(
+        name="current-boundary-changes-to-addressbase.sql",
+        context={"from_table": current_boundary_changes.table_name},
+    ),
+)
+
+current_boundary_reviews_parquet = GlueTable(
+    table_name="current_boundary_reviews_parquet",
+    description="The final product of the current boundary changes layer. A list of UPRNs with current boundary reviews grouped by outcode",
+    s3_prefix="addressbase/{dc_environment}/current_boundary_reviews_parquet",
+    bucket=pollingstations_private_data,
+    database=dc_data_baker,
+    data_format=glue.DataFormat.PARQUET,
+    columns={
+        "uprn": glue.Schema.STRING,
+        "address": glue.Schema.STRING,
+        "postcode": glue.Schema.STRING,
+        "addressbase_source": glue.Schema.STRING,
+        "boundary_review_ids": glue.Schema.map(
+            glue.Schema.INTEGER,
+            input_string="map<string,map<string,string>>",
+            is_primitive=False,
+        ),
+        "outcode": glue.Schema.STRING,
+    },
 )
