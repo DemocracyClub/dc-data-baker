@@ -8,22 +8,12 @@ UNLOAD (
 			addressbase_source
 		FROM addressbase_partitioned
 	),
-	addresses_with_reviews AS (
-		SELECT
-			ab.uprn,
-			atbc.boundary_review_id,
-			atbc.division_type,
-			atbc.boundary_change_details
-		FROM addressbase_partitioned ab
-		JOIN addresses_to_boundary_change atbc ON ab.uprn = atbc.uprn
-		WHERE atbc.boundary_review_id IS NOT NULL
-	),
 	grouped_by_review AS (
 		SELECT
 			uprn,
 			boundary_review_id,
 			map_agg(division_type, boundary_change_details) AS division_map
-		FROM addresses_with_reviews
+		FROM addresses_to_boundary_change
 		GROUP BY uprn, boundary_review_id
 	),
 	aggregated_reviews AS (
