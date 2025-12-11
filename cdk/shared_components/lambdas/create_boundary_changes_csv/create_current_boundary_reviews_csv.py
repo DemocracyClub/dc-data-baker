@@ -95,8 +95,8 @@ def handler(event, context):
     db_user = "every_election"
     db_port = "5432"
 
-    s3_bucket = "dc-data-baker-results-bucket"
-    s3_prefix = "current_boundary_reviews-with-wkt"
+    s3_bucket = event["s3_bucket"]
+    s3_prefix = event["s3_prefix"]
 
     query = export_sql()
 

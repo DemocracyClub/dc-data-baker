@@ -180,6 +180,12 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             self,
             "Make current boundary changes CSV",
             lambda_function=create_current_boundary_changes_csv_function,
+            payload=sfn.TaskInput.from_object(
+                {
+                    "s3_bucket": current_boundary_changes.bucket.bucket_name,
+                    "s3_prefix": current_boundary_changes.s3_prefix,
+                }
+            ),
         )
 
     def make_partitions_task(self, table) -> tasks.LambdaInvoke:
