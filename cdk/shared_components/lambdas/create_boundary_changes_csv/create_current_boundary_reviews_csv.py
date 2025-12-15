@@ -68,7 +68,6 @@ def export_sql():
         r.organisation_gss,
         ds.id AS divisionset_id,
         d.slug AS division_slug,
-        CONCAT(d.divisionset_id, '-', d.slug) AS division_composite_id,
         st_astext (dgs.geography) AS division_boundary_wkt,
         r.boundary_review_id,
         CASE
