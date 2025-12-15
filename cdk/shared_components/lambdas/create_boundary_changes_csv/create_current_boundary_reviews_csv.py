@@ -107,7 +107,7 @@ def handler(event, context):
         password=db_password,
         port=db_port,
     )
-    cur = conn.cursor()
+    cur = conn.cursor(row_factory=psycopg.rows.dict_row)
     cur.execute(query)
     rows = cur.fetchall()
 
@@ -115,9 +115,9 @@ def handler(event, context):
     partition_buffers = {}
 
     for row in rows:
-        boundary_review_id = row[15]
-        divisionset_generation = row[16]
-        division_type = row[17]
+        boundary_review_id = row["boundary_review_id"]
+        divisionset_generation = row["divisionset_generation"]
+        division_type = row["division_type"]
 
         key = (boundary_review_id, divisionset_generation, division_type)
         if key not in partition_buffers:
@@ -127,7 +127,7 @@ def handler(event, context):
         else:
             buf, writer = partition_buffers[key]
 
-        writer.writerow(row)
+        writer.writerow(row.values())
 
     s3 = boto3.client("s3")
     for (boundary_review_id, divisionset_generation, division_type), (
