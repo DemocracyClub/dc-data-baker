@@ -126,6 +126,29 @@ class DataBakerCoreStack(DataBakerStack):
             iam.PolicyStatement(actions=["glue:GetTable"], resources=["*"]),
         )
 
+        first_letter_to_outcode_parquet_lambda = aws_lambda_python.PythonFunction(
+            self,
+            "first_letter_to_outcode_parquet",
+            function_name="first_letter_to_outcode_parquet",
+            runtime=aws_lambda.Runtime.PYTHON_3_12,
+            handler="handler",
+            entry="cdk/shared_components/lambdas/first_letter_to_outcode_parquet/",
+            index="first_letter_to_outcode_parquet.py",
+            timeout=Duration.seconds(900),
+            memory_size=4096,
+        )
+
+        first_letter_to_outcode_parquet_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "athena:*",
+                    "s3:*",
+                    "glue:*",
+                ],
+                resources=["*"],
+            )
+        )
+
         CfnOutput(
             self,
             "WorkgroupNameOutput",
@@ -162,6 +185,13 @@ class DataBakerCoreStack(DataBakerStack):
             "GetGlueTableLocationArnOutput",
             value=get_glue_table_location_lambda.function_arn,
             export_name="GetGlueTableLocationArnOutput",
+        )
+
+        CfnOutput(
+            self,
+            "FirstLetterToOutcodeParquetLambdaArnOutput",
+            value=first_letter_to_outcode_parquet_lambda.function_arn,
+            export_name="FirstLetterToOutcodeParquetLambdaArnOutput",
         )
 
     def make_database(self):
