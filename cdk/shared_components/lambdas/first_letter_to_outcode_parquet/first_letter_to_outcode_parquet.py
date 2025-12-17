@@ -1,4 +1,5 @@
 import os
+import shutil
 from pathlib import Path
 
 import boto3
@@ -28,10 +29,15 @@ def handler(event, context):
         return
 
     # Loop through each object and download it to /tmp.
-    LOCAL_SOURCE_DIR = Path(f"/tmp/{first_letter}")
-    LOCAL_SOURCE_DIR.mkdir(exist_ok=True)
+    LOCAL_SOURCE_DIR = Path(f"/tmp/{filter_column}/{first_letter}")
+    if LOCAL_SOURCE_DIR.exists():
+        shutil.rmtree(LOCAL_SOURCE_DIR)
 
-    BY_OUTCODE_PATH = Path(f"/tmp/by_outcodes/{first_letter}")
+    LOCAL_SOURCE_DIR.mkdir(exist_ok=True, parents=True)
+
+    BY_OUTCODE_PATH = Path(f"/tmp/by_outcodes/{filter_column}/{first_letter}")
+    if BY_OUTCODE_PATH.exists():
+        shutil.rmtree(BY_OUTCODE_PATH)
     BY_OUTCODE_PATH.mkdir(exist_ok=True, parents=True)
 
     for obj in response["Contents"]:
