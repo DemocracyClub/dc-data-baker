@@ -57,6 +57,18 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             )
         )
 
+        self.first_letter_to_outcode_parquet_lambda_arn = Fn.import_value(
+            "FirstLetterToOutcodeParquetLambdaArnOutput"
+        )
+
+        self.first_letter_to_outcode_parquet_lambda = (
+            aws_lambda.Function.from_function_arn(
+                self,
+                "FirstLetterToOutcodeParquet",
+                self.first_letter_to_outcode_parquet_lambda_arn,
+            )
+        )
+
         delete_old_current_boundary_changes_task = (
             self.make_delete_old_current_boundary_changes_task()
         )
@@ -329,34 +341,7 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             ),
         )
 
-    def make_to_outcode_parquet_task(self) -> tasks.LambdaInvoke:
-        to_outcode_parquet = aws_lambda_python.PythonFunction(
-            self,
-            "first_letter_to_outcode_parquett_boundary_reviews",
-            function_name="first_letter_to_outcode_parquet_boundary_reviews",
-            runtime=aws_lambda.Runtime.PYTHON_3_12,
-            handler="handler",
-            entry="cdk/shared_components/lambdas/first_letter_to_outcode_parquet/",
-            index="first_letter_to_outcode_parquet.py",
-            timeout=Duration.seconds(900),
-            memory_size=4096,
-        )
-
-        to_outcode_parquet.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "athena:*",
-                    "s3:*",
-                    "glue:*",
-                ],
-                resources=["*"],
-            )
-        )
-
-        return to_outcode_parquet
-
     def make_parallel_outcodes_task(self) -> sfn.Parallel:
-        to_outcode_parquet = self.make_to_outcode_parquet_task()
         parallel_outcodes = sfn.Parallel(
             self, "Make outcode parquet per first letter"
         )
@@ -369,7 +354,7 @@ class CurrentBoundaryChangesStack(DataBakerStack):
                 tasks.LambdaInvoke(
                     self,
                     f"Make outcode parquet for {letter}",
-                    lambda_function=to_outcode_parquet,
+                    lambda_function=self.first_letter_to_outcode_parquet_lambda,
                     payload=sfn.TaskInput.from_object(
                         {
                             "first_letter": letter,
