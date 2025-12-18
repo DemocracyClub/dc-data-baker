@@ -68,6 +68,7 @@ def export_sql():
         r.organisation_gss,
         ds.id AS divisionset_id,
         d.slug AS division_slug,
+        d.official_identifier AS division_official_identifier,
         st_astext (dgs.geography) AS division_boundary_wkt,
         r.boundary_review_id,
         CASE
