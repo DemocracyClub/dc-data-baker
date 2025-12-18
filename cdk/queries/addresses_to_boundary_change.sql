@@ -3,6 +3,7 @@ UNLOAD (
         divisionsets AS (
             SELECT
                 division_slug,
+                division_official_identifier,
                 boundary_review_id,
                 division_type,
                 division_boundary_wkt,
@@ -27,7 +28,9 @@ UNLOAD (
                 od.boundary_review_id,
                 od.division_type,
                 od.division_slug AS old_division_slug,
-                nd.division_slug AS new_division_slug
+                od.division_official_identifier AS old_division_official_identifier,
+                nd.division_slug AS new_division_slug,
+                nd.division_official_identifier AS new_division_official_identifier
             FROM
                 addressbase_partitioned a JOIN old_divisionset od ON ST_WITHIN (
                     ST_POINT(a.longitude, a.latitude),
@@ -76,7 +79,9 @@ UNLOAD (
                 a.division_type,
         		a.boundary_review_id,
         		a.old_division_slug AS old_division_slug,
+        		a.old_division_official_identifier AS old_division_official_identifier,
         		a.new_division_slug AS new_division_slug,
+        		a.new_division_official_identifier AS new_division_official_identifier,
             bts.old_division_slug IS NOT NULL AS boundary_same,
             nts.old_division_slug IS NOT NULL AS name_same
         FROM addresses a
@@ -95,11 +100,13 @@ UNLOAD (
         division_type,
         boundary_review_id,
         MAP(
-            ARRAY['division_type', 'old_division_slug', 'new_division_slug', 'change_scenario'],
+            ARRAY['division_type', 'old_division_slug', 'old_division_official_identifier', 'new_division_slug', 'new_division_official_identifier', 'change_scenario'],
             ARRAY[
                 division_type,
                 old_division_slug,
+                old_division_official_identifier,
                 new_division_slug,
+                new_division_official_identifier,
                 CASE
                     WHEN boundary_same AND name_same THEN 'NO_CHANGE'
                     WHEN boundary_same AND NOT name_same THEN 'NAME_CHANGED'
