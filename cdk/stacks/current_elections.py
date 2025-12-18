@@ -40,6 +40,9 @@ from shared_components.buckets import (
 from shared_components.constructs.addressbase_source_check_construct import (
     AddressBaseSourceCheckConstruct,
 )
+from shared_components.constructs.make_partitions_construct import (
+    MakePartitionsConstruct,
+)
 from shared_components.models import GlueTable, S3Bucket
 from shared_components.tables import (
     current_ballots,
@@ -76,13 +79,27 @@ class CurrentElectionsStack(DataBakerStack):
             )
         )
 
+        self.first_letter_to_outcode_parquet_lambda_arn = Fn.import_value(
+            "FirstLetterToOutcodeParquetLambdaArnOutput"
+        )
+
+        self.first_letter_to_outcode_parquet_lambda = (
+            aws_lambda.Function.from_function_arn(
+                self,
+                "FirstLetterToOutcodeParquet",
+                self.first_letter_to_outcode_parquet_lambda_arn,
+            )
+        )
+
         delete_old_current_ballots_joined_to_addressbase_task = (
             self.make_delete_old_current_ballots_joined_to_addressbase_task()
         )
 
         parallel_first_letter_task = self.make_parallel_first_letter_task()
 
-        make_partitions = self.make_partitions_task()
+        make_partitions = self.make_partitions_task(
+            current_ballots_joined_to_address_base
+        )
 
         # Fan-out step (for each letter A-Z)
         parallel_outcodes_task = self.make_parallel_outcodes_task()
@@ -293,50 +310,15 @@ class CurrentElectionsStack(DataBakerStack):
             ),
         )
 
-    def make_partitions_task(self) -> tasks.LambdaInvoke:
-        return tasks.LambdaInvoke(
+    def make_partitions_task(self, table) -> tasks.LambdaInvoke:
+        return MakePartitionsConstruct(
             self,
-            "Make partitions",
-            lambda_function=self.athena_query_lambda,
-            payload=sfn.TaskInput.from_object(
-                {
-                    "context": {
-                        "table_name": current_ballots_joined_to_address_base.table_name
-                    },
-                    "QueryString": "MSCK REPAIR TABLE `$table_name`;",
-                    "blocking": True,
-                }
-            ),
-        )
-
-    def make_to_outcode_parquet_task(self) -> tasks.LambdaInvoke:
-        to_outcode_parquet = aws_lambda_python.PythonFunction(
-            self,
-            "first_letter_to_outcode_parquet",
-            function_name="first_letter_to_outcode_parquet",
-            runtime=aws_lambda.Runtime.PYTHON_3_12,
-            handler="handler",
-            entry="cdk/shared_components/lambdas/first_letter_to_outcode_parquet/",
-            index="first_letter_to_outcode_parquet.py",
-            timeout=Duration.seconds(900),
-            memory_size=2048,
-        )
-
-        to_outcode_parquet.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "athena:*",
-                    "s3:*",
-                    "glue:*",
-                ],
-                resources=["*"],
-            )
-        )
-
-        return to_outcode_parquet
+            f"Make partitions For{table.table_name}",
+            athena_query_lambda=self.athena_query_lambda,
+            target_table_name=table.table_name,
+        ).entry_point
 
     def make_parallel_outcodes_task(self) -> sfn.Parallel:
-        to_outcode_parquet = self.make_to_outcode_parquet_task()
         parallel_outcodes = sfn.Parallel(
             self, "Make outcode parquet per first letter"
         )
@@ -349,7 +331,7 @@ class CurrentElectionsStack(DataBakerStack):
                 tasks.LambdaInvoke(
                     self,
                     f"Make outcode parquet for {letter}",
-                    lambda_function=to_outcode_parquet,
+                    lambda_function=self.first_letter_to_outcode_parquet_lambda,
                     payload=sfn.TaskInput.from_object(
                         {
                             "first_letter": letter,
@@ -359,6 +341,7 @@ class CurrentElectionsStack(DataBakerStack):
                             ),
                             "dest_bucket_name": pollingstations_private_data.bucket_name,
                             "dest_path": f"addressbase/{self.dc_environment}/current_elections_parquet",
+                            "filter_column": "ballot_ids",
                         }
                     ),
                 )
