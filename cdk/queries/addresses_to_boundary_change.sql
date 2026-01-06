@@ -7,6 +7,7 @@ UNLOAD (
                 boundary_review_id,
                 division_type,
                 division_boundary_wkt,
+                divisionset_pmtiles_url,
                 divisionset_generation
             FROM current_boundary_changes
             WHERE
@@ -26,6 +27,8 @@ UNLOAD (
                 a.postcode,
                 a.addressbase_source,
                 od.boundary_review_id,
+                od.divisionset_pmtiles_url AS old_divisionset_pmtiles_url,
+                nd.divisionset_pmtiles_url AS new_divisionset_pmtiles_url,
                 od.division_type,
                 od.division_slug AS old_division_slug,
                 od.division_official_identifier AS old_division_official_identifier,
@@ -78,6 +81,8 @@ UNLOAD (
                 a.addressbase_source,
                 a.division_type,
         		a.boundary_review_id,
+                a.old_divisionset_pmtiles_url AS old_divisionset_pmtiles_url,
+                a.new_divisionset_pmtiles_url AS new_divisionset_pmtiles_url,
         		a.old_division_slug AS old_division_slug,
         		a.old_division_official_identifier AS old_division_official_identifier,
         		a.new_division_slug AS new_division_slug,
@@ -100,13 +105,15 @@ UNLOAD (
         division_type,
         boundary_review_id,
         MAP(
-            ARRAY['division_type', 'old_division_slug', 'old_division_official_identifier', 'new_division_slug', 'new_division_official_identifier', 'change_scenario'],
+            ARRAY['division_type', 'old_division_slug', 'old_division_official_identifier', 'old_divisionset_pmtiles_url', 'new_division_slug', 'new_division_official_identifier', 'new_divisionset_pmtiles_url', 'change_scenario'],
             ARRAY[
                 division_type,
                 old_division_slug,
                 old_division_official_identifier,
+                old_divisionset_pmtiles_url,
                 new_division_slug,
                 new_division_official_identifier,
+                new_divisionset_pmtiles_url,
                 CASE
                     WHEN boundary_same AND name_same THEN 'NO_CHANGE'
                     WHEN boundary_same AND NOT name_same THEN 'NAME_CHANGED'

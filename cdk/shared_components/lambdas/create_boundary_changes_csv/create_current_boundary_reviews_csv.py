@@ -16,9 +16,15 @@ password_response = ssm_client.get_parameter(
 )
 db_password = password_response["Parameter"]["Value"]
 
+ee_data_bucket_response = ssm_client.get_parameter(
+    Name="/EveryElectionProd/PUBLIC_DATA_BUCKET",
+)
+
+ee_public_data_bucket = ee_data_bucket_response["Parameter"]["Value"]
+
 
 def export_sql():
-    return """
+    return f"""
     WITH
         review AS (
             SELECT
@@ -32,6 +38,7 @@ def export_sql():
                 obr.created AS review_created,
                 obr.modified AS review_modified,
                 o.common_name AS organisation_name,
+                o.slug as organisation_slug,
                 o.official_name AS organisation_official_name,
                 og.gss AS organisation_gss,
                 obr.divisionset_id AS new_divisionset_id,
@@ -67,6 +74,7 @@ def export_sql():
         r.organisation_official_name,
         r.organisation_gss,
         ds.id AS divisionset_id,
+        concat('https://s3.eu-west-2.amazonaws.com/', '{ee_public_data_bucket}', '/pmtiles-store/', r.organisation_slug, '_', ds.id, '_', ds.pmtiles_md5_hash, '.pmtiles') AS divisionset_pmtiles_url,
         d.slug AS division_slug,
         d.official_identifier AS division_official_identifier,
         st_astext (dgs.geography) AS division_boundary_wkt,

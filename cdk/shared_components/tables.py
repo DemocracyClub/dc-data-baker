@@ -111,6 +111,7 @@ current_boundary_changes = GlueTable(
         "organisation_official_name": glue.Schema.STRING,
         "organisation_gss": glue.Schema.STRING,
         "divisionset_id": glue.Schema.STRING,
+        "divisionset_pmtiles_url": glue.Schema.STRING,
         "division_slug": glue.Schema.STRING,
         "division_official_identifier": glue.Schema.STRING,
         "division_boundary_wkt": glue.Schema.STRING,
