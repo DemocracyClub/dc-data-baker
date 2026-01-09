@@ -22,10 +22,10 @@ UNLOAD (
        -- This is one row per uprn with a list of reviews for that uprn.
 		SELECT
 			uprn,
-               array_agg(
-                       '{{"boundary_review_id":' || json_format(CAST(boundary_review_id AS JSON)) ||
-                       ',"changes":' || json_format(CAST(boundary_changes AS JSON)) || '}}'
-               ) AS boundary_reviews
+            array_agg(
+                   '{{"boundary_review_id":' || json_format(CAST(boundary_review_id AS JSON)) ||
+                   ',"changes":' || json_format(CAST(boundary_changes AS JSON)) || '}}'
+            ) AS boundary_reviews
 		FROM grouped_by_review
 		GROUP BY uprn
 	)
@@ -34,7 +34,7 @@ UNLOAD (
 		aa.address,
 		aa.postcode,
 		aa.addressbase_source,
-           COALESCE(ar.boundary_reviews, ARRAY[]) AS boundary_reviews,
+        COALESCE(ar.boundary_reviews, ARRAY[]) AS boundary_reviews,
 		aa.first_letter
 	FROM all_addresses aa
 	LEFT JOIN aggregated_reviews ar ON aa.uprn = ar.uprn
