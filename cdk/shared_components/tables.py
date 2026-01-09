@@ -171,10 +171,8 @@ current_boundary_reviews_joined_to_addressbase = GlueTable(
         "address": glue.Schema.STRING,
         "postcode": glue.Schema.STRING,
         "addressbase_source": glue.Schema.STRING,
-        "boundary_review_ids": glue.Schema.map(
-            glue.Schema.INTEGER,
-            input_string="map<string,map<string,string>>",
-            is_primitive=False,
+        "boundary_review_ids": glue.Schema.array(
+            input_string="string", is_primitive=True
         ),
     },
     partition_keys=[
@@ -201,10 +199,8 @@ current_boundary_reviews_parquet = GlueTable(
         "address": glue.Schema.STRING,
         "postcode": glue.Schema.STRING,
         "addressbase_source": glue.Schema.STRING,
-        "boundary_review_ids": glue.Schema.map(
-            glue.Schema.INTEGER,
-            input_string="map<string,map<string,string>>",
-            is_primitive=False,
+        "boundary_review_ids": glue.Schema.array(
+            input_string="string", is_primitive=True
         ),
         "outcode": glue.Schema.STRING,
     },

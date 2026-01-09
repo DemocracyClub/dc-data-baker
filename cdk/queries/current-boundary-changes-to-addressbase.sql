@@ -9,17 +9,23 @@ UNLOAD (
 		FROM addressbase_partitioned
 	),
 	grouped_by_review AS (
+       -- This is one row per (uprn, review_id) with a list of changes for that review.
+       -- number of changes corresponds to number of division types affected by the review.
 		SELECT
 			uprn,
 			boundary_review_id,
-			map_agg(division_type, boundary_change_details) AS division_map
+               array_agg(boundary_change_details) AS boundary_changes
 		FROM addresses_to_boundary_change
 		GROUP BY uprn, boundary_review_id
 	),
 	aggregated_reviews AS (
+       -- This is one row per uprn with a list of reviews for that uprn.
 		SELECT
 			uprn,
-			map_agg(boundary_review_id, division_map) AS boundary_review_ids
+               array_agg(
+                       '{{"boundary_review_id":' || json_format(CAST(boundary_review_id AS JSON)) ||
+                       ',"changes":' || json_format(CAST(boundary_changes AS JSON)) || '}}'
+               ) AS boundary_review_ids
 		FROM grouped_by_review
 		GROUP BY uprn
 	)
@@ -28,7 +34,7 @@ UNLOAD (
 		aa.address,
 		aa.postcode,
 		aa.addressbase_source,
-		COALESCE(ar.boundary_review_ids, MAP()) AS boundary_review_ids,
+           COALESCE(ar.boundary_review_ids, ARRAY[]) AS boundary_review_ids,
 		aa.first_letter
 	FROM all_addresses aa
 	LEFT JOIN aggregated_reviews ar ON aa.uprn = ar.uprn
