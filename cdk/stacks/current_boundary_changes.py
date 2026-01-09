@@ -366,7 +366,7 @@ class CurrentBoundaryChangesStack(DataBakerStack):
                             "dest_path": current_boundary_reviews_parquet.s3_prefix.format(
                                 dc_environment=self.dc_environment
                             ),
-                            "filter_column": "boundary_review_ids",
+                            "filter_column": "boundary_reviews",
                         }
                     ),
                 )
