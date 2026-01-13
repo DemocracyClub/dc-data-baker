@@ -11,7 +11,10 @@ UNLOAD (
                 divisionset_generation,
                 consultation_url,
                 legislation_title,
-                effective_date
+                effective_date,
+                organisation_name,
+                organisation_official_name,
+                organisation_gss
             FROM current_boundary_changes
             WHERE
                 boundary_review_id = {boundary_review_id}
@@ -39,7 +42,10 @@ UNLOAD (
                 nd.division_official_identifier AS new_division_official_identifier,
                 od.consultation_url,
                 od.legislation_title,
-                od.effective_date
+                od.effective_date,
+                od.organisation_name,
+                od.organisation_official_name,
+                od.organisation_gss
             FROM
                 addressbase_partitioned a JOIN old_divisionset od ON ST_WITHIN (
                     ST_POINT(a.longitude, a.latitude),
@@ -96,6 +102,9 @@ UNLOAD (
                 a.consultation_url,
                 a.legislation_title,
                 a.effective_date,
+                a.organisation_name,
+                a.organisation_official_name,
+                a.organisation_gss,
             bts.old_division_slug IS NOT NULL AS boundary_same,
             nts.old_division_slug IS NOT NULL AS name_same
         FROM addresses a
@@ -132,11 +141,14 @@ UNLOAD (
             ]
         ) AS boundary_change_details,
         MAP(
-            ARRAY['consultation_url', 'legislation_title', 'effective_date'],
+            ARRAY['consultation_url', 'legislation_title', 'effective_date', 'organisation_name', 'organisation_official_name', 'organisation_gss'],
             ARRAY[
                 consultation_url,
                 legislation_title,
-                effective_date
+                effective_date,
+                organisation_name,
+                organisation_official_name,
+                organisation_gss
             ]
         ) AS boundary_review_details
     FROM results
