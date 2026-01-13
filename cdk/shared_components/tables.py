@@ -151,6 +151,11 @@ addresses_to_boundary_change = GlueTable(
             input_string="string",
             is_primitive=True,
         ),
+        "boundary_review_details": glue.Schema.map(
+            glue.Schema.STRING,
+            input_string="string",
+            is_primitive=True,
+        ),
     },
     populated_with=BaseQuery(
         name="addresses_to_boundary_change.sql",

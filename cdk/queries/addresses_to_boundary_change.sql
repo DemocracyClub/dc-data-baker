@@ -8,7 +8,10 @@ UNLOAD (
                 division_type,
                 division_boundary_wkt,
                 divisionset_pmtiles_url,
-                divisionset_generation
+                divisionset_generation,
+                consultation_url,
+                legislation_title,
+                effective_date
             FROM current_boundary_changes
             WHERE
                 boundary_review_id = {boundary_review_id}
@@ -33,7 +36,10 @@ UNLOAD (
                 od.division_slug AS old_division_slug,
                 od.division_official_identifier AS old_division_official_identifier,
                 nd.division_slug AS new_division_slug,
-                nd.division_official_identifier AS new_division_official_identifier
+                nd.division_official_identifier AS new_division_official_identifier,
+                od.consultation_url,
+                od.legislation_title,
+                od.effective_date
             FROM
                 addressbase_partitioned a JOIN old_divisionset od ON ST_WITHIN (
                     ST_POINT(a.longitude, a.latitude),
@@ -87,6 +93,9 @@ UNLOAD (
         		a.old_division_official_identifier AS old_division_official_identifier,
         		a.new_division_slug AS new_division_slug,
         		a.new_division_official_identifier AS new_division_official_identifier,
+                a.consultation_url,
+                a.legislation_title,
+                a.effective_date,
             bts.old_division_slug IS NOT NULL AS boundary_same,
             nts.old_division_slug IS NOT NULL AS name_same
         FROM addresses a
@@ -121,7 +130,15 @@ UNLOAD (
                     ELSE 'BOTH_CHANGED'
                 END
             ]
-        ) AS boundary_change_details
+        ) AS boundary_change_details,
+        MAP(
+            ARRAY['consultation_url', 'legislation_title', 'effective_date'],
+            ARRAY[
+                consultation_url,
+                legislation_title,
+                effective_date
+            ]
+        ) AS boundary_review_details
     FROM results
 ) TO '$table_full_s3_path' WITH (
     format = 'PARQUET',
