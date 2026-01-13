@@ -11,10 +11,13 @@ UNLOAD (
 	grouped_by_review AS (
        -- This is one row per (uprn, review_id) with a list of changes for that review.
        -- number of changes corresponds to number of division types affected by the review.
+       -- boundary_review_details is the same for all rows with the same boundary_review_id,
+       -- so we use arbitrary() to pick one value.
 		SELECT
 			uprn,
 			boundary_review_id,
-               array_agg(boundary_change_details) AS boundary_changes
+            arbitrary(boundary_review_details) AS boundary_review_details,
+            array_agg(boundary_change_details) AS boundary_changes
 		FROM addresses_to_boundary_change
 		GROUP BY uprn, boundary_review_id
 	),
@@ -24,6 +27,7 @@ UNLOAD (
 			uprn,
             array_agg(
                    '{{"boundary_review_id":' || json_format(CAST(boundary_review_id AS JSON)) ||
+                   ',"boundary_review_details":' || json_format(CAST(boundary_review_details AS JSON)) ||
                    ',"changes":' || json_format(CAST(boundary_changes AS JSON)) || '}}'
             ) AS boundary_reviews
 		FROM grouped_by_review
