@@ -188,8 +188,8 @@ current_boundary_reviews_joined_to_addressbase = GlueTable(
         )
     ],
     populated_with=BaseQuery(
-        name="current-boundary-changes-to-addressbase.sql",
-        context={"from_table": current_boundary_changes.table_name},
+        name="current-boundary-reviews-to-addressbase.sql",
+        context={},
     ),
 )
 
