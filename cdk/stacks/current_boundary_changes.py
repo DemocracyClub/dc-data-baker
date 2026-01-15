@@ -224,7 +224,9 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             payload=sfn.TaskInput.from_object(
                 {
                     "bucket": addresses_to_boundary_change.bucket.bucket_name,
-                    "prefix": addresses_to_boundary_change.s3_prefix,
+                    "prefix": addresses_to_boundary_change.s3_prefix.format(
+                        **self.context
+                    ),
                 }
             ),
         )
@@ -320,7 +322,9 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             payload=sfn.TaskInput.from_object(
                 {
                     "bucket": current_boundary_reviews_joined_to_addressbase.bucket.bucket_name,
-                    "prefix": current_boundary_reviews_joined_to_addressbase.s3_prefix,
+                    "prefix": current_boundary_reviews_joined_to_addressbase.s3_prefix.format(
+                        **self.context
+                    ),
                 }
             ),
         )
