@@ -21,6 +21,17 @@ runs:
         aws-region: eu-west-2
         role-to-assume: ${{ inputs.aws-role-arn }}
 
+    - name: CDK Deploy Core
+      run: |
+        scripts/cdk-deploy.sh \
+          --require-approval never \
+          --asset-parallelism true \
+          --outputs-file cdk-outputs.json \
+          DataBakerCoreStack
+      shell: bash
+      env:
+        DC_ENVIRONMENT: ${{ inputs.dc-environment }}
+
     - name: CDK Deploy
       run: |
         scripts/cdk-deploy.sh --all \
