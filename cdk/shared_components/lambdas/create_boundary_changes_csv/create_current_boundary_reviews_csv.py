@@ -16,11 +16,7 @@ password_response = ssm_client.get_parameter(
 )
 db_password = password_response["Parameter"]["Value"]
 
-ee_data_bucket_response = ssm_client.get_parameter(
-    Name="/EveryElectionProd/PUBLIC_DATA_BUCKET",
-)
-
-ee_public_data_bucket = ee_data_bucket_response["Parameter"]["Value"]
+ee_public_data_bucket = "ee.public.data"
 
 
 def export_sql():
