@@ -76,6 +76,7 @@ def export_sql():
         ds.id AS divisionset_id,
         concat('https://s3.eu-west-2.amazonaws.com/', '{ee_public_data_bucket}', '/pmtiles-store/', r.organisation_slug, '_', ds.id, '_', ds.pmtiles_md5_hash, '.pmtiles') AS divisionset_pmtiles_url,
         d.slug AS division_slug,
+        d.name AS division_name,
         d.official_identifier AS division_official_identifier,
         st_astext (dgs.geography) AS division_boundary_wkt,
         r.boundary_review_id,

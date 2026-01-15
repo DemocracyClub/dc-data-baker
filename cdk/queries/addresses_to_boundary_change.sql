@@ -3,6 +3,7 @@ UNLOAD (
         divisionsets AS (
             SELECT
                 division_slug,
+                division_name,
                 division_official_identifier,
                 boundary_review_id,
                 division_type,
@@ -37,8 +38,10 @@ UNLOAD (
                 nd.divisionset_pmtiles_url AS new_divisionset_pmtiles_url,
                 od.division_type,
                 od.division_slug AS old_division_slug,
+                od.division_name AS old_division_name,
                 od.division_official_identifier AS old_division_official_identifier,
                 nd.division_slug AS new_division_slug,
+                nd.division_name AS new_division_name,
                 nd.division_official_identifier AS new_division_official_identifier,
                 od.consultation_url,
                 od.legislation_title,
@@ -96,8 +99,10 @@ UNLOAD (
                 a.old_divisionset_pmtiles_url AS old_divisionset_pmtiles_url,
                 a.new_divisionset_pmtiles_url AS new_divisionset_pmtiles_url,
         		a.old_division_slug AS old_division_slug,
+                a.old_division_name AS old_division_name,
         		a.old_division_official_identifier AS old_division_official_identifier,
         		a.new_division_slug AS new_division_slug,
+                a.new_division_name AS new_division_name,
         		a.new_division_official_identifier AS new_division_official_identifier,
                 a.consultation_url,
                 a.legislation_title,
@@ -123,13 +128,15 @@ UNLOAD (
         division_type,
         boundary_review_id,
         MAP(
-            ARRAY['division_type', 'old_division_slug', 'old_division_official_identifier', 'old_divisionset_pmtiles_url', 'new_division_slug', 'new_division_official_identifier', 'new_divisionset_pmtiles_url', 'change_scenario'],
+            ARRAY['division_type', 'old_division_slug', 'old_division_name', 'old_division_official_identifier', 'old_divisionset_pmtiles_url', 'new_division_slug', 'new_division_name', 'new_division_official_identifier', 'new_divisionset_pmtiles_url', 'change_scenario'],
             ARRAY[
                 division_type,
                 old_division_slug,
+                old_division_name,
                 old_division_official_identifier,
                 old_divisionset_pmtiles_url,
                 new_division_slug,
+                new_division_name,
                 new_division_official_identifier,
                 new_divisionset_pmtiles_url,
                 CASE
