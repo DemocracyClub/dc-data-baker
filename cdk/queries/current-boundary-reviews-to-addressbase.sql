@@ -17,7 +17,7 @@ UNLOAD (
 			uprn,
 			boundary_review_id,
             arbitrary(boundary_review_details) AS boundary_review_details,
-            array_agg(boundary_change_details) AS boundary_changes
+            array_agg(boundary_change_details ORDER BY division_type) AS boundary_changes
 		FROM addresses_to_boundary_change
 		GROUP BY uprn, boundary_review_id
 	),
@@ -29,6 +29,7 @@ UNLOAD (
                    '{{"boundary_review_id":' || json_format(CAST(boundary_review_id AS JSON)) ||
                    ',"boundary_review_details":' || json_format(CAST(boundary_review_details AS JSON)) ||
                    ',"changes":' || json_format(CAST(boundary_changes AS JSON)) || '}}'
+                    ORDER BY boundary_review_id
             ) AS boundary_reviews
 		FROM grouped_by_review
 		GROUP BY uprn
