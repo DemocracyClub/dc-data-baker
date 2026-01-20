@@ -15,9 +15,6 @@ list will trigger a re-build of this data package.
 from typing import List
 
 import aws_cdk.aws_lambda_python_alpha as aws_lambda_python
-import aws_cdk.aws_pipes_alpha as aws_pipes_alpha
-import aws_cdk.aws_pipes_sources_alpha as aws_pipes_sources_alpha
-import aws_cdk.aws_pipes_targets_alpha as aws_pipes_targets_alpha
 from aws_cdk import (
     CfnOutput,
     Duration,
@@ -42,6 +39,9 @@ from shared_components.constructs.addressbase_source_check_construct import (
 )
 from shared_components.constructs.make_partitions_construct import (
     MakePartitionsConstruct,
+)
+from shared_components.constructs.step_function_event_queue_construct import (
+    StepFunctionEventQueueConstruct,
 )
 from shared_components.models import GlueTable, S3Bucket
 from shared_components.tables import (
@@ -214,57 +214,18 @@ class CurrentElectionsStack(DataBakerStack):
         )
 
     def make_event_triggers(self):
-        event_queue = aws_sqs.Queue(
+        event_queue = StepFunctionEventQueueConstruct(
             self,
-            "CurrentElectionsEventQueue",
-            fifo=True,
-            content_based_deduplication=True,
-            queue_name="CurrentElectionsEventQueue.fifo",
-            encryption=aws_sqs.QueueEncryption.UNENCRYPTED,
-            delivery_delay=Duration.minutes(5),
-        )
+            "MakeCurrentElectionsEventQueue",
+            target_step_function=self.step_function,
+            queue_name="CurrentElectionsEventQueue",
+            pipe_name="RunCurrentElectionsBuilder",
+        ).entry_point
 
         self.make_run_nightly_rule(event_queue)
         self.make_rebuild_election_parquet_rule(event_queue)
-        self.make_sqs_to_sfn_pipe(event_queue)
 
-    def make_sqs_to_sfn_pipe(self, event_queue):
-        pipe_role = iam.Role(
-            self,
-            "PipeRole",
-            assumed_by=iam.ServicePrincipal("pipes.amazonaws.com"),
-        )
-        pipe_role.add_to_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "sqs:ReceiveMessage",
-                    "sqs:DeleteMessage",
-                    "sqs:GetQueueAttributes",
-                ],
-                resources=[event_queue.queue_arn],
-            )
-        )
-        pipe_role.add_to_policy(
-            iam.PolicyStatement(
-                actions=["states:StartExecution"],
-                resources=[self.step_function.state_machine_arn],
-            )
-        )
-
-        aws_pipes_alpha.Pipe(
-            self,
-            "RunCurrentElectionsBuilder",
-            role=pipe_role,
-            source=aws_pipes_sources_alpha.SqsSource(
-                event_queue,
-            ),
-            target=aws_pipes_targets_alpha.SfnStateMachine(
-                self.step_function,
-                invocation_type=aws_pipes_targets_alpha.StateMachineInvocationType.FIRE_AND_FORGET,
-            ),
-        )
-
-    def make_run_nightly_rule(self, event_queue: aws_sqs.Queue):
+    def make_run_nightly_rule(self, event_queue: aws_sqs.IQueue):
         one_am = aws_events.Schedule.cron(minute="0", hour="1")
         run_nightly_rule = aws_events.Rule(
             self, "RebuildCurrentElectionsNightlyTrigger", schedule=one_am
@@ -278,7 +239,7 @@ class CurrentElectionsStack(DataBakerStack):
             )
         )
 
-    def make_rebuild_election_parquet_rule(self, event_queue):
+    def make_rebuild_election_parquet_rule(self, event_queue: aws_sqs.IQueue):
         aws_events.Rule(
             self,
             "RebuildCurrentElectionsParquetTrigger",
