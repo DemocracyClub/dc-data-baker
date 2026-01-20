@@ -21,6 +21,10 @@ class CheckStateMachinesRun:
         self.current_selection_state_machine_arn = (
             self.get_current_elections_state_machine_arn()
         )
+
+        self.current_boundary_changes_state_machine_arn = (
+            self.get_current_boundary_changes_state_machine_arn()
+        )
         self.sfn_client = boto3.client("stepfunctions")
 
     def handle(self):
@@ -28,6 +32,9 @@ class CheckStateMachinesRun:
         self.check_state_machine(self.addressbase_state_machine_arn)
         self.check_state_machine(
             self.current_selection_state_machine_arn, timeout=120
+        )
+        self.check_state_machine(
+            self.current_boundary_changes_state_machine_arn, timeout=120
         )
 
     def get_addressbase_state_machine_arn(self):
@@ -37,6 +44,14 @@ class CheckStateMachinesRun:
     def get_current_elections_state_machine_arn(self):
         current_elections_outputs = self.cdk_output["CurrentElectionsStack"]
         return current_elections_outputs["MakeCurrentElectionsParquetArnOutput"]
+
+    def get_current_boundary_changes_state_machine_arn(self):
+        current_boundary_changes_outputs = self.cdk_output[
+            "CurrentBoundaryChangesStack"
+        ]
+        return current_boundary_changes_outputs[
+            "MakeCurrentBoundaryChangesParquetArnOutput"
+        ]
 
     def check_state_machine(self, state_machine_arn, timeout=60):
         print(f"Checking {state_machine_arn}")

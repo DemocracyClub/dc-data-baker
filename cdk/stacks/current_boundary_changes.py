@@ -2,6 +2,7 @@ from typing import List
 
 import aws_cdk.aws_lambda_python_alpha as aws_lambda_python
 from aws_cdk import (
+    CfnOutput,
     Duration,
     Fn,
     aws_events,
@@ -144,6 +145,13 @@ class CurrentBoundaryChangesStack(DataBakerStack):
         )
 
         self.make_event_triggers()
+
+        CfnOutput(
+            self,
+            "MakeCurrentBoundaryChangesParquetArnOutput",
+            value=self.step_function.state_machine_arn,
+            export_name="MakeCurrentBoundaryChangesParquetArn",
+        )
 
     @staticmethod
     def s3_buckets() -> List[S3Bucket]:
