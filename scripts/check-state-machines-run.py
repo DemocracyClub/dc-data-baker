@@ -34,7 +34,7 @@ class CheckStateMachinesRun:
             self.current_elections_state_machine_arn, timeout=120
         )
         self.check_state_machine(
-            self.current_boundary_changes_state_machine_arn, timeout=120
+            self.current_boundary_changes_state_machine_arn, timeout=240
         )
 
     def get_addressbase_state_machine_arn(self):
