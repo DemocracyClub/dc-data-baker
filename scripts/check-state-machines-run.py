@@ -18,7 +18,7 @@ class CheckStateMachinesRun:
         self.addressbase_state_machine_arn = (
             self.get_addressbase_state_machine_arn()
         )
-        self.current_selection_state_machine_arn = (
+        self.current_elections_state_machine_arn = (
             self.get_current_elections_state_machine_arn()
         )
 
@@ -31,7 +31,7 @@ class CheckStateMachinesRun:
         print("Checking state-machines run...")
         self.check_state_machine(self.addressbase_state_machine_arn)
         self.check_state_machine(
-            self.current_selection_state_machine_arn, timeout=120
+            self.current_elections_state_machine_arn, timeout=120
         )
         self.check_state_machine(
             self.current_boundary_changes_state_machine_arn, timeout=120
