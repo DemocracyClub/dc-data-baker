@@ -21,6 +21,9 @@ from shared_components.buckets import (
 from shared_components.constructs.addressbase_data_quality_check_construct import (
     AddressbaseDataQualityCheckConstruct,
 )
+from shared_components.constructs.guarded_step_function_construct import (
+    GuardedStepFunctionConstruct,
+)
 from shared_components.constructs.make_partitions_construct import (
     MakePartitionsConstruct,
 )
@@ -53,16 +56,6 @@ class CurrentBoundaryChangesStack(DataBakerStack):
         self.empty_bucket_by_prefix_lambda = (
             aws_lambda.Function.from_function_arn(
                 self, "EmptyS3BucketByPrefix", self.empty_bucket_by_prefix
-            )
-        )
-        self.check_step_function_running = Fn.import_value(
-            "CheckStepFunctionRunningArnOutput"
-        )
-        self.check_step_function_running_function = (
-            aws_lambda.Function.from_function_arn(
-                self,
-                "CheckStepFunctionRunningArnOutput",
-                self.check_step_function_running,
             )
         )
 
@@ -136,13 +129,12 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             .next(parallel_outcodes_task)
         )
 
-        self.step_function = sfn.StateMachine(
+        self.step_function = GuardedStepFunctionConstruct(
             self,
             "MakeCurrentBoundaryChangesParquet",
-            state_machine_name="MakeCurrentBoundaryChangesParquet",
-            definition=main_tasks,
-            timeout=Duration.minutes(10),
-        )
+            step_function_name="MakeCurrentBoundaryChangesParquet",
+            main_tasks=main_tasks,
+        ).entry_point
 
         self.make_event_triggers()
 
