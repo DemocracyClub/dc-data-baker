@@ -40,6 +40,9 @@ from shared_components.constructs.addressbase_source_check_construct import (
 from shared_components.constructs.make_partitions_construct import (
     MakePartitionsConstruct,
 )
+from shared_components.constructs.singleton_state_machine_construct import (
+    SingletonStateMachineConstruct,
+)
 from shared_components.constructs.step_function_event_queue_construct import (
     StepFunctionEventQueueConstruct,
 )
@@ -66,16 +69,6 @@ class CurrentElectionsStack(DataBakerStack):
         self.empty_bucket_by_prefix_lambda = (
             aws_lambda.Function.from_function_arn(
                 self, "EmptyS3BucketByPrefix", self.empty_bucket_by_prefix
-            )
-        )
-        self.check_step_function_running = Fn.import_value(
-            "CheckStepFunctionRunningArnOutput"
-        )
-        self.check_step_function_running_function = (
-            aws_lambda.Function.from_function_arn(
-                self,
-                "CheckStepFunctionRunningArnOutput",
-                self.check_step_function_running,
             )
         )
 
@@ -123,21 +116,12 @@ class CurrentElectionsStack(DataBakerStack):
             .next(addressbase_check.entry_point)
         )
 
-        should_run_decision = self.make_should_run_decision(main_tasks)
-        check_step_function_running_task = (
-            self.make_check_step_function_running_task()
-        )
-        state_definition = check_step_function_running_task.next(
-            should_run_decision
-        )
-
-        self.step_function = sfn.StateMachine(
+        self.step_function = SingletonStateMachineConstruct(
             self,
-            "MakeCurrentElectionsParquet",
-            state_machine_name="MakeCurrentElectionsParquet",
-            definition=state_definition,
-            timeout=Duration.minutes(10),
-        )
+            "MakeCurrentElectionsParquet ",
+            step_function_name="MakeCurrentElectionsParquet",
+            main_tasks=main_tasks,
+        ).entry_point
 
         self.make_event_triggers()
 
@@ -155,34 +139,6 @@ class CurrentElectionsStack(DataBakerStack):
     @staticmethod
     def s3_buckets() -> List[S3Bucket]:
         return [ee_data_cache_production, pollingstations_private_data]
-
-    def make_should_run_decision(self, main_tasks) -> sfn.Choice:
-        fail_state = sfn.Fail(
-            self,
-            "StopExecution",
-            cause="ConcurrentExecution",
-            error="AnotherExecutionRunning",
-        )
-        decision = sfn.Choice(self, "CanProceed?")
-        decision.when(
-            sfn.Condition.boolean_equals("$.proceed", True), main_tasks
-        )
-        decision.otherwise(fail_state)
-        return decision
-
-    def make_check_step_function_running_task(self) -> tasks.LambdaInvoke:
-        return tasks.LambdaInvoke(
-            self,
-            "CheckConcurrentExecution",
-            lambda_function=self.check_step_function_running_function,
-            payload=sfn.TaskInput.from_object(
-                {
-                    "stateMachineArn.$": "$$.StateMachine.Id",
-                    "currentExecutionArn.$": "$$.Execution.Id",
-                }
-            ),
-            output_path="$.Payload",
-        )
 
     def make_create_current_csv_task(self) -> tasks.LambdaInvoke:
         create_current_elections_csv_function = aws_lambda_python.PythonFunction(
