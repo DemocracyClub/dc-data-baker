@@ -4,7 +4,7 @@ from aws_cdk import aws_stepfunctions_tasks as tasks
 from constructs import Construct
 
 
-class GuardedStepFunctionConstruct(Construct):
+class SingletonStateMachineConstruct(Construct):
     """
     A CDK construct that returns a step function with a built-in guard to prevent concurrent executions.
     The step function will invoke a lambda function to check if there are any running executions of the same state machine, and only proceed if there are none.

@@ -37,11 +37,11 @@ from shared_components.buckets import (
 from shared_components.constructs.addressbase_source_check_construct import (
     AddressBaseSourceCheckConstruct,
 )
-from shared_components.constructs.guarded_step_function_construct import (
-    GuardedStepFunctionConstruct,
-)
 from shared_components.constructs.make_partitions_construct import (
     MakePartitionsConstruct,
+)
+from shared_components.constructs.singleton_state_machine_construct import (
+    SingletonStateMachineConstruct,
 )
 from shared_components.constructs.step_function_event_queue_construct import (
     StepFunctionEventQueueConstruct,
@@ -116,7 +116,7 @@ class CurrentElectionsStack(DataBakerStack):
             .next(addressbase_check.entry_point)
         )
 
-        self.step_function = GuardedStepFunctionConstruct(
+        self.step_function = SingletonStateMachineConstruct(
             self,
             "MakeCurrentElectionsParquet ",
             step_function_name="MakeCurrentElectionsParquet",

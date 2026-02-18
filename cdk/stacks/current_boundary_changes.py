@@ -21,11 +21,11 @@ from shared_components.buckets import (
 from shared_components.constructs.addressbase_data_quality_check_construct import (
     AddressbaseDataQualityCheckConstruct,
 )
-from shared_components.constructs.guarded_step_function_construct import (
-    GuardedStepFunctionConstruct,
-)
 from shared_components.constructs.make_partitions_construct import (
     MakePartitionsConstruct,
+)
+from shared_components.constructs.singleton_state_machine_construct import (
+    SingletonStateMachineConstruct,
 )
 from shared_components.constructs.step_function_event_queue_construct import (
     StepFunctionEventQueueConstruct,
@@ -129,7 +129,7 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             .next(parallel_outcodes_task)
         )
 
-        self.step_function = GuardedStepFunctionConstruct(
+        self.step_function = SingletonStateMachineConstruct(
             self,
             "MakeCurrentBoundaryChangesParquet",
             step_function_name="MakeCurrentBoundaryChangesParquet",
