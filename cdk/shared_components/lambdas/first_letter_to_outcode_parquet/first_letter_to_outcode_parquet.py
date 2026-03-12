@@ -40,12 +40,19 @@ def check_duplicate_uprns(
     If duplicates have conflicting data, raise ConflictingDuplicateUPRNError.
 
     """
-    duplicated_uprn_count = first_letter_data.filter(
+    duplicated_rows = first_letter_data.filter(
         polars.col("uprn").is_duplicated()
-    )["uprn"].n_unique()
+    )
+    duplicated_uprn_count = duplicated_rows["uprn"].n_unique()
 
     if duplicated_uprn_count == 0:
         return first_letter_data
+
+    logger.warning(
+        f"check_duplicate_uprns: {first_letter=} {len(first_letter_data)=} {duplicated_uprn_count=}"
+    )
+    logger.warning(f"duplicated uprns:\n{duplicated_rows.sort('uprn')}")
+
     if duplicated_uprn_count == 1:
         msg = f"{duplicated_uprn_count} UPRN has duplicated rows for first_letter={first_letter}"
     else:
