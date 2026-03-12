@@ -1,14 +1,115 @@
+import logging
 import os
 import shutil
+import urllib.parse
 from pathlib import Path
 
 import boto3
 import polars
+import sentry_sdk
+from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
+
+sentry_sdk.init(
+    dsn=os.environ.get("SENTRY_DSN"),
+    integrations=[AwsLambdaIntegration()],
+)
+
+
+class IdenticalDuplicateUPRNError(Exception):
+    pass
+
+
+class ConflictingDuplicateUPRNError(Exception):
+    pass
+
+
+logger = logging.getLogger(__name__)
 
 s3_client = boto3.client("s3")
 
 
+def check_duplicate_uprns(
+    first_letter_data: polars.DataFrame, first_letter: str
+) -> polars.DataFrame:
+    """
+    Check for duplicate UPRNs in the data.
+
+    If there are no duplicate UPRNs then return the data unchanged.
+    If all duplicates are identical rows, deduplicate, report to Sentry and return deduplicated dataframe.
+    If duplicates have conflicting data, raise ConflictingDuplicateUPRNError.
+
+    """
+    duplicated_uprn_count = first_letter_data.filter(
+        polars.col("uprn").is_duplicated()
+    )["uprn"].n_unique()
+
+    if duplicated_uprn_count == 0:
+        return first_letter_data
+    if duplicated_uprn_count == 1:
+        msg = f"{duplicated_uprn_count} UPRN has duplicated rows for first_letter={first_letter}"
+    else:
+        msg = f"{duplicated_uprn_count} UPRNs have duplicate rows for first_letter={first_letter}"
+    unique_rows = first_letter_data.unique()
+
+    if unique_rows["uprn"].n_unique() == len(unique_rows):
+        # All duplicate rows are identical, safe to deduplicate
+        msg += (
+            " All duplicates are identical. Deduplicating and continuing."
+            " The data is probably correct, but we want to understand why this happened."
+        )
+
+        logger.error(msg)
+        with sentry_sdk.new_scope() as scope:
+            scope.set_context(
+                "duplicate_uprns",
+                {
+                    "first_letter": first_letter,
+                    "duplicated_uprn_count": duplicated_uprn_count,
+                },
+            )
+            scope.capture_exception(IdenticalDuplicateUPRNError(msg))
+        return unique_rows
+
+    # Some duplicate UPRNs have conflicting data
+    with sentry_sdk.new_scope() as scope:
+        scope.set_context(
+            "duplicate_uprns",
+            {
+                "first_letter": first_letter,
+                "duplicated_uprn_count": duplicated_uprn_count,
+            },
+        )
+        msg += (
+            " Duplicate uprns are not in identical rows."
+            " This indicates a data integrity issue that needs investigation."
+        )
+        raise ConflictingDuplicateUPRNError(msg)
+
+
 def handler(event, context):
+    # Add CloudWatch log link to Sentry context
+    # https://docs.aws.amazon.com/lambda/latest/dg/python-context.html
+    region = os.environ.get("AWS_REGION", "eu-west-2")
+    log_group = getattr(context, "log_group_name", None)
+    log_stream = getattr(context, "log_stream_name", None)
+    if log_group and log_stream:
+        encoded_group = urllib.parse.quote(log_group, safe="")
+        encoded_stream = urllib.parse.quote(log_stream, safe="")
+        cloudwatch_url = (
+            f"https://{region}.console.aws.amazon.com/cloudwatch/home"
+            f"?region={region}#logsV2:log-groups/log-group/{encoded_group}"
+            f"/log-events/{encoded_stream}"
+        )
+        sentry_sdk.set_context(
+            "cloudwatch",
+            {
+                "url": cloudwatch_url,
+                "log_group": log_group,
+                "log_stream": log_stream,
+                "request_id": getattr(context, "aws_request_id", None),
+            },
+        )
+
     # Get parameters from the event.
     first_letter = event["first_letter"]
     source_bucket_name = event["source_bucket_name"]
@@ -52,6 +153,9 @@ def handler(event, context):
 
     print(f"{LOCAL_SOURCE_DIR}/*")
     first_letter_data = polars.read_parquet(f"{LOCAL_SOURCE_DIR}/*")
+
+    first_letter_data = check_duplicate_uprns(first_letter_data, first_letter)
+
     first_letter_data = first_letter_data.with_columns(
         polars.col("postcode").str.split(" ").list.first().alias("outcode")
     )
