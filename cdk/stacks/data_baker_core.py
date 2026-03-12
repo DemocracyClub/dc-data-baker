@@ -143,6 +143,7 @@ class DataBakerCoreStack(DataBakerStack):
                 "SENTRY_DSN": ssm.StringParameter.value_for_string_parameter(
                     self, "/dc-data-baker/SENTRY_DSN"
                 ),
+                "DC_ENVIRONMENT": self.dc_environment,
             },
         )
 

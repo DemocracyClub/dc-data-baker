@@ -11,6 +11,7 @@ from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
 
 sentry_sdk.init(
     dsn=os.environ.get("SENTRY_DSN"),
+    environment=os.environ.get("DC_ENVIRONMENT"),
     integrations=[AwsLambdaIntegration()],
 )
 
@@ -202,9 +203,9 @@ def handler(event, context):
 
 if __name__ == "__main__":
     event = {
-        "first_letter": "G",
-        "source_bucket_name": "dc-data-baker-results-bucket",
-        "source_path": "current_ballots_joined_to_address_base/",
+        "first_letter": "A",
+        "source_bucket_name": "pollingstations.private.data",
+        "source_path": "addressbase/development/current_ballots_joined_to_address_base/",
         "dest_bucket_name": "dc-data-baker-results-bucket",
         "dest_path": "current_election_parquet",
         "filter_column": "ballot_ids",
