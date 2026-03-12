@@ -15,6 +15,9 @@ from aws_cdk import aws_athena as athena
 from aws_cdk import (
     aws_iam as iam,
 )
+from aws_cdk import (
+    aws_ssm as ssm,
+)
 from constructs import Construct
 from shared_components.buckets import (
     data_baker_results_bucket,
@@ -136,6 +139,11 @@ class DataBakerCoreStack(DataBakerStack):
             index="first_letter_to_outcode_parquet.py",
             timeout=Duration.seconds(900),
             memory_size=4096,
+            environment={
+                "SENTRY_DSN": ssm.StringParameter.value_for_string_parameter(
+                    self, "/dc-data-baker/SENTRY_DSN"
+                ),
+            },
         )
 
         first_letter_to_outcode_parquet_lambda.add_to_role_policy(
