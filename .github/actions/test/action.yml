@@ -11,3 +11,7 @@ runs:
     - name: Pre-test checks
       shell: bash
       run: uv run scripts/code-check.sh
+
+    - name: Run tests
+      shell: bash
+      run: uv run --with polars --with sentry-sdk pytest
