@@ -76,7 +76,7 @@ class TestCheckDuplicateUPRNs:
             ]
         )
         result = check_duplicate_uprns(df, "A")
-        assert result["uprn"].to_list() == ["1", "2"]
+        assert sorted(result["uprn"].to_list()) == ["1", "2"]
         assert len(result) == 2
 
     @patch("first_letter_to_outcode_parquet.sentry_sdk")
