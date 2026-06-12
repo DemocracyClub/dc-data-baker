@@ -139,8 +139,12 @@ def handler(event, context):
     by_outcode_dir = None
 
     try:
-        local_source_dir = make_local_source_dir(filter_column, first_letter)
-        by_outcode_dir = make_outcode_dir(filter_column, first_letter)
+        local_source_dir = clean_and_make_dir(
+            f"/tmp/{filter_column}/{first_letter}"
+        )
+        by_outcode_dir = clean_and_make_dir(
+            f"/tmp/by_outcodes/{filter_column}/{first_letter}"
+        )
         download_parquet(object_keys, local_source_dir, source_bucket_name)
 
         outcode_dfs = get_outcode_dfs(first_letter, local_source_dir)
@@ -178,22 +182,13 @@ def get_all_object_keys(bucket_name: str, prefix: str) -> list[str]:
     return object_keys
 
 
-def make_outcode_dir(filter_column, first_letter) -> Path:
-    by_outcode_dir = Path(f"/tmp/by_outcodes/{filter_column}/{first_letter}")
-    if by_outcode_dir.exists():
-        shutil.rmtree(by_outcode_dir)
-    by_outcode_dir.mkdir(exist_ok=True, parents=True)
-    print(f"By outcode_path: {by_outcode_dir}")
-    return by_outcode_dir
-
-
-def make_local_source_dir(filter_column, first_letter) -> Path:
-    local_source_dir = Path(f"/tmp/{filter_column}/{first_letter}")
-    if local_source_dir.exists():
-        shutil.rmtree(local_source_dir)
-    local_source_dir.mkdir(exist_ok=True, parents=True)
-    print(f"Local source_dir: {local_source_dir}")
-    return local_source_dir
+def clean_and_make_dir(path: str) -> Path:
+    dir_path = Path(path)
+    if dir_path.exists():
+        shutil.rmtree(dir_path)
+    dir_path.mkdir(parents=True)
+    print(f"Made {dir_path}")
+    return dir_path
 
 
 def get_outcode_dfs(first_letter, local_source_dir: Path) -> list[DataFrame]:
