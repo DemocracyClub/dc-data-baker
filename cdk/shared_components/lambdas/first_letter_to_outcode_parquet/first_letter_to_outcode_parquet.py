@@ -132,27 +132,36 @@ def handler(event, context):
     response = s3_client.list_objects_v2(
         Bucket=source_bucket_name, Prefix=prefix
     )
-
     # Check if there are any objects returned.
     if "Contents" not in response:
         print(f"No objects found in s3://{source_bucket_name}/{prefix}")
         return
 
-    local_source_dir = make_local_source_dir(filter_column, first_letter)
-    by_outcode_dir = make_outcode_dir(filter_column, first_letter)
+    local_source_dir = None
+    by_outcode_dir = None
 
-    download_parquet(response, local_source_dir, source_bucket_name)
+    try:
+        local_source_dir = make_local_source_dir(filter_column, first_letter)
+        by_outcode_dir = make_outcode_dir(filter_column, first_letter)
+        download_parquet(response, local_source_dir, source_bucket_name)
 
-    outcode_dfs = get_outcode_dfs(first_letter, local_source_dir)
+        outcode_dfs = get_outcode_dfs(first_letter, local_source_dir)
 
-    for outcode_df in outcode_dfs:
-        upload_outcode_parquet(
-            by_outcode_dir,
-            dest_bucket_name,
-            dest_path,
-            filter_column,
-            outcode_df,
-        )
+        for outcode_df in outcode_dfs:
+            upload_outcode_parquet(
+                by_outcode_dir,
+                dest_bucket_name,
+                dest_path,
+                filter_column,
+                outcode_df,
+            )
+
+    finally:
+        if local_source_dir:
+            shutil.rmtree(local_source_dir)
+
+        if by_outcode_dir:
+            shutil.rmtree(by_outcode_dir)
 
 
 def make_outcode_dir(filter_column, first_letter) -> Path:
@@ -168,7 +177,6 @@ def make_local_source_dir(filter_column, first_letter) -> Path:
     local_source_dir = Path(f"/tmp/{filter_column}/{first_letter}")
     if local_source_dir.exists():
         shutil.rmtree(local_source_dir)
-
     local_source_dir.mkdir(exist_ok=True, parents=True)
     print(f"Local source_dir: {local_source_dir}")
     return local_source_dir
@@ -262,11 +270,9 @@ def download_parquet(
         key = obj["Key"]
         # Use the basename of the key as the local filename.
         local_file = local_source_dir / os.path.basename(key)
-        if not local_file.exists():
-            print(
-                f"Downloading s3://{source_bucket_name}/{key} to {local_file}"
-            )
-            s3_client.download_file(source_bucket_name, key, local_file)
+
+        print(f"Downloading s3://{source_bucket_name}/{key} to {local_file}")
+        s3_client.download_file(source_bucket_name, key, local_file)
 
 
 if __name__ == "__main__":
