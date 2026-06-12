@@ -251,8 +251,7 @@ def upload_outcode_parquet(
         print(
             f"At least one UPRN in {outcode} has data in {filter_column}, writing a file with data"
         )
-        outcode_df.sort(by=["postcode", "uprn"])
-        outcode_df.write_parquet(outcode_path)
+        outcode_df.sort(by=["postcode", "uprn"]).write_parquet(outcode_path)
     else:
         print(
             f"No {filter_column} for any address in {outcode}, writing an empty file"

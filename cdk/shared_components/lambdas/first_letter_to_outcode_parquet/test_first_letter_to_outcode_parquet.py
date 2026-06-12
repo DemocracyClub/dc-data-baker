@@ -6,6 +6,7 @@ from first_letter_to_outcode_parquet import (
     ConflictingDuplicateUPRNError,
     IdenticalDuplicateUPRNError,
     check_duplicate_uprns,
+    upload_outcode_parquet,
 )
 
 
@@ -224,3 +225,51 @@ class TestCheckDuplicateUPRNs:
         result = check_duplicate_uprns(df, "A")
         assert result["uprn"].n_unique() == 3
         assert len(result) == 3
+
+
+class TestUploadOutcodeParquet:
+    def test_writes_sorted_data(self, tmp_path):
+        """The parquet file written for an outcode is sorted by postcode, uprn."""
+        outcode_df = polars.DataFrame(
+            {
+                "uprn": ["4", "3", "1", "2"],
+                "postcode": ["AA1 1BB", "AA1 1BB", "AA1 1AA", "AA1 1AA"],
+                "outcode": ["AA1", "AA1", "AA1", "AA1"],
+                "ballot_ids": [[], ["b1"], ["b2"], ["b3"]],
+            }
+        )
+
+        with patch("first_letter_to_outcode_parquet.s3_client"):
+            upload_outcode_parquet(
+                tmp_path, "dest-bucket", "dest/path", "ballot_ids", outcode_df
+            )
+
+        written = polars.read_parquet(tmp_path / "AA1.parquet")
+        assert written["postcode"].to_list() == [
+            "AA1 1AA",
+            "AA1 1AA",
+            "AA1 1BB",
+            "AA1 1BB",
+        ]
+        assert written["uprn"].to_list() == ["1", "2", "3", "4"]
+
+        assert written.equals(
+            polars.DataFrame(
+                {
+                    "uprn": ["1", "2", "3", "4"],
+                    "postcode": [
+                        "AA1 1AA",
+                        "AA1 1AA",
+                        "AA1 1BB",
+                        "AA1 1BB",
+                    ],
+                    "outcode": ["AA1", "AA1", "AA1", "AA1"],
+                    "ballot_ids": [
+                        ["b2"],
+                        ["b3"],
+                        ["b1"],
+                        [],
+                    ],
+                }
+            )
+        )
