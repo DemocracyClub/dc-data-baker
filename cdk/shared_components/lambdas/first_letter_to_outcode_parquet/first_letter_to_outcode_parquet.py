@@ -138,29 +138,29 @@ def handler(event, context):
         return
 
     # Loop through each object and download it to /tmp.
-    LOCAL_SOURCE_DIR = Path(f"/tmp/{filter_column}/{first_letter}")
-    if LOCAL_SOURCE_DIR.exists():
-        shutil.rmtree(LOCAL_SOURCE_DIR)
+    local_source_dir = Path(f"/tmp/{filter_column}/{first_letter}")
+    if local_source_dir.exists():
+        shutil.rmtree(local_source_dir)
 
-    LOCAL_SOURCE_DIR.mkdir(exist_ok=True, parents=True)
+    local_source_dir.mkdir(exist_ok=True, parents=True)
 
-    BY_OUTCODE_PATH = Path(f"/tmp/by_outcodes/{filter_column}/{first_letter}")
-    if BY_OUTCODE_PATH.exists():
-        shutil.rmtree(BY_OUTCODE_PATH)
-    BY_OUTCODE_PATH.mkdir(exist_ok=True, parents=True)
+    by_outcode_path = Path(f"/tmp/by_outcodes/{filter_column}/{first_letter}")
+    if by_outcode_path.exists():
+        shutil.rmtree(by_outcode_path)
+    by_outcode_path.mkdir(exist_ok=True, parents=True)
 
     for obj in response["Contents"]:
         key = obj["Key"]
         # Use the basename of the key as the local filename.
-        local_file = LOCAL_SOURCE_DIR / os.path.basename(key)
+        local_file = local_source_dir / os.path.basename(key)
         if not local_file.exists():
             print(
                 f"Downloading s3://{source_bucket_name}/{key} to {local_file}"
             )
             s3_client.download_file(source_bucket_name, key, local_file)
 
-    print(f"{LOCAL_SOURCE_DIR}/*")
-    first_letter_data = polars.read_parquet(f"{LOCAL_SOURCE_DIR}/*")
+    print(f"{local_source_dir}/*")
+    first_letter_data = polars.read_parquet(f"{local_source_dir}/*")
 
     first_letter_data = check_duplicate_uprns(first_letter_data, first_letter)
 
@@ -190,7 +190,7 @@ def handler(event, context):
             f"any_row_has_{filter_column}"
         ][0]  # Boolean True/False
 
-        outcode_path = BY_OUTCODE_PATH / f"{outcode}.parquet"
+        outcode_path = by_outcode_path / f"{outcode}.parquet"
 
         if has_any_non_null_filter_column:
             print(
