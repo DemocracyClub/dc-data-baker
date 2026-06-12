@@ -129,11 +129,9 @@ def handler(event, context):
 
     prefix = f"{source_path}first_letter={first_letter}"
 
-    response = s3_client.list_objects_v2(
-        Bucket=source_bucket_name, Prefix=prefix
-    )
+    object_keys = get_all_object_keys(source_bucket_name, prefix)
     # Check if there are any objects returned.
-    if "Contents" not in response:
+    if not object_keys:
         print(f"No objects found in s3://{source_bucket_name}/{prefix}")
         return
 
@@ -143,7 +141,7 @@ def handler(event, context):
     try:
         local_source_dir = make_local_source_dir(filter_column, first_letter)
         by_outcode_dir = make_outcode_dir(filter_column, first_letter)
-        download_parquet(response, local_source_dir, source_bucket_name)
+        download_parquet(object_keys, local_source_dir, source_bucket_name)
 
         outcode_dfs = get_outcode_dfs(first_letter, local_source_dir)
 
@@ -162,6 +160,22 @@ def handler(event, context):
 
         if by_outcode_dir:
             shutil.rmtree(by_outcode_dir)
+
+
+def get_all_object_keys(bucket_name: str, prefix: str) -> list[str]:
+    """
+    Args:
+        bucket_name: Bucket to list objects from
+        prefix: Only list objects whose keys start with this prefix
+
+    Returns: list of object keys
+    """
+    paginator = s3_client.get_paginator("list_objects_v2")
+    object_keys = []
+    for page in paginator.paginate(Bucket=bucket_name, Prefix=prefix):
+        for obj in page.get("Contents", []):
+            object_keys.append(obj["Key"])
+    return object_keys
 
 
 def make_outcode_dir(filter_column, first_letter) -> Path:
@@ -263,10 +277,9 @@ def upload_outcode_parquet(
 
 
 def download_parquet(
-    response: dict, local_source_dir: Path, source_bucket_name: str
+    object_keys: list[str], local_source_dir: Path, source_bucket_name: str
 ):
-    for obj in response["Contents"]:
-        key = obj["Key"]
+    for key in object_keys:
         # Use the basename of the key as the local filename.
         local_file = local_source_dir / os.path.basename(key)
 
