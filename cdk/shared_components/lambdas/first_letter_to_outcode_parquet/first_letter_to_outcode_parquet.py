@@ -7,6 +7,7 @@ from pathlib import Path
 import boto3
 import polars
 import sentry_sdk
+from polars import DataFrame
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
 
 sentry_sdk.init(
@@ -137,18 +138,126 @@ def handler(event, context):
         print(f"No objects found in s3://{source_bucket_name}/{prefix}")
         return
 
-    # Loop through each object and download it to /tmp.
+    local_source_dir = make_local_source_dir(filter_column, first_letter)
+    by_outcode_dir = make_outcode_dir(filter_column, first_letter)
+
+    download_parquet(response, local_source_dir, source_bucket_name)
+
+    outcode_dfs = get_outcode_dfs(first_letter, local_source_dir)
+
+    for outcode_df in outcode_dfs:
+        upload_outcode_parquet(
+            by_outcode_dir,
+            dest_bucket_name,
+            dest_path,
+            filter_column,
+            outcode_df,
+        )
+
+
+def make_outcode_dir(filter_column, first_letter) -> Path:
+    by_outcode_dir = Path(f"/tmp/by_outcodes/{filter_column}/{first_letter}")
+    if by_outcode_dir.exists():
+        shutil.rmtree(by_outcode_dir)
+    by_outcode_dir.mkdir(exist_ok=True, parents=True)
+    print(f"By outcode_path: {by_outcode_dir}")
+    return by_outcode_dir
+
+
+def make_local_source_dir(filter_column, first_letter) -> Path:
     local_source_dir = Path(f"/tmp/{filter_column}/{first_letter}")
     if local_source_dir.exists():
         shutil.rmtree(local_source_dir)
 
     local_source_dir.mkdir(exist_ok=True, parents=True)
+    print(f"Local source_dir: {local_source_dir}")
+    return local_source_dir
 
-    by_outcode_path = Path(f"/tmp/by_outcodes/{filter_column}/{first_letter}")
-    if by_outcode_path.exists():
-        shutil.rmtree(by_outcode_path)
-    by_outcode_path.mkdir(exist_ok=True, parents=True)
 
+def get_outcode_dfs(first_letter, local_source_dir: Path) -> list[DataFrame]:
+    """
+    Reads all the parquet files for postcodes starting with 'first_letter' into
+    a dataframe. Then adds an 'outcode' column, and then partitions the dataframe
+    into a dataframe per outcode.
+    These 'outcode dataframes' are returned as a list.
+
+    Args:
+        first_letter: The first letter of the postcode.
+        local_source_dir: Where the parquet files are stored locally
+
+    Returns: list of outcode dataframes
+
+    """
+    first_letter_data = polars.read_parquet(f"{local_source_dir}/*")
+
+    first_letter_data = check_duplicate_uprns(first_letter_data, first_letter)
+
+    first_letter_data = first_letter_data.with_columns(
+        polars.col("postcode").str.split(" ").list.first().alias("outcode")
+    )
+
+    return first_letter_data.partition_by("outcode")
+
+
+def upload_outcode_parquet(
+    by_outcode_dir: Path,
+    dest_bucket_name: str,
+    dest_path: str,
+    filter_column: str,
+    outcode_df: DataFrame,
+):
+    """
+    Checks outcode dataframe for any null values in filter_column,
+    and either writes outcode file with data, or an empty file if
+    all values are null. Then uploads the file to s3.
+
+    Args:
+        by_outcode_dir: Local directory for writing <outcode>.parquet files
+        dest_bucket_name: Bucket to upload <outcode>.parquet files to
+        dest_path: s3 prefix after bucket before file: s3://<dest_bucket_name>/<dest_path>/<outcode>.parquet
+        filter_column: column to check if it has non null values. Included here for print logs
+        outcode_df: dataframe with all outcode data.
+    """
+    outcode = outcode_df["outcode"][0]
+    print(outcode)
+
+    expr_has_non_null_filter_column = (
+        polars.col(filter_column)
+        .list.eval(polars.element().is_not_null())
+        .list.sum()
+        .alias(f"has_non_null_{filter_column}")
+    )
+
+    has_any_non_null_filter_column_df = outcode_df.select(
+        (expr_has_non_null_filter_column > 0)
+        .any()
+        .alias(f"any_row_has_{filter_column}")
+    )
+    has_any_non_null_filter_column = has_any_non_null_filter_column_df[
+        f"any_row_has_{filter_column}"
+    ][0]  # Boolean True/False
+
+    outcode_path = by_outcode_dir / f"{outcode}.parquet"
+
+    if has_any_non_null_filter_column:
+        print(
+            f"At least one UPRN in {outcode} has data in {filter_column}, writing a file with data"
+        )
+        outcode_df.sort(by=["postcode", "uprn"])
+        outcode_df.write_parquet(outcode_path)
+    else:
+        print(
+            f"No {filter_column} for any address in {outcode}, writing an empty file"
+        )
+        polars.DataFrame().write_parquet(outcode_path)
+    s3_client.upload_file(
+        outcode_path, dest_bucket_name, f"{dest_path}/{outcode}.parquet"
+    )
+
+
+def download_parquet(
+    response: dict, local_source_dir: Path, source_bucket_name: str
+):
     for obj in response["Contents"]:
         key = obj["Key"]
         # Use the basename of the key as the local filename.
@@ -158,54 +267,6 @@ def handler(event, context):
                 f"Downloading s3://{source_bucket_name}/{key} to {local_file}"
             )
             s3_client.download_file(source_bucket_name, key, local_file)
-
-    print(f"{local_source_dir}/*")
-    first_letter_data = polars.read_parquet(f"{local_source_dir}/*")
-
-    first_letter_data = check_duplicate_uprns(first_letter_data, first_letter)
-
-    first_letter_data = first_letter_data.with_columns(
-        polars.col("postcode").str.split(" ").list.first().alias("outcode")
-    )
-
-    outcode_dfs = first_letter_data.partition_by("outcode")
-
-    expr_has_non_null_filter_column = (
-        polars.col(filter_column)
-        .list.eval(polars.element().is_not_null())
-        .list.sum()
-        .alias(f"has_non_null_{filter_column}")
-    )
-
-    for outcode_df in outcode_dfs:
-        outcode = outcode_df["outcode"][0]
-        print(outcode)
-
-        has_any_non_null_filter_column_df = outcode_df.select(
-            (expr_has_non_null_filter_column > 0)
-            .any()
-            .alias(f"any_row_has_{filter_column}")
-        )
-        has_any_non_null_filter_column = has_any_non_null_filter_column_df[
-            f"any_row_has_{filter_column}"
-        ][0]  # Boolean True/False
-
-        outcode_path = by_outcode_path / f"{outcode}.parquet"
-
-        if has_any_non_null_filter_column:
-            print(
-                f"At least one UPRN in {outcode} has data in {filter_column}, writing a file with data"
-            )
-            outcode_df.sort(by=["postcode", "uprn"])
-            outcode_df.write_parquet(outcode_path)
-        else:
-            print(
-                f"No {filter_column} for any address in {outcode}, writing an empty file"
-            )
-            polars.DataFrame().write_parquet(outcode_path)
-        s3_client.upload_file(
-            outcode_path, dest_bucket_name, f"{dest_path}/{outcode}.parquet"
-        )
 
 
 if __name__ == "__main__":
