@@ -34,8 +34,8 @@ from shared_components.buckets import (
     ee_data_cache_production,
     pollingstations_private_data,
 )
-from shared_components.constructs.addressbase_source_check_construct import (
-    AddressBaseSourceCheckConstruct,
+from shared_components.constructs.addressbase_data_quality_check_construct import (
+    AddressbaseDataQualityCheckConstruct,
 )
 from shared_components.constructs.make_partitions_construct import (
     MakePartitionsConstruct,
@@ -48,6 +48,7 @@ from shared_components.constructs.step_function_event_queue_construct import (
 )
 from shared_components.models import GlueTable, S3Bucket
 from shared_components.tables import (
+    addressbase_cleaned_raw,
     current_ballots,
     current_ballots_joined_to_address_base,
 )
@@ -99,11 +100,12 @@ class CurrentElectionsStack(DataBakerStack):
 
         create_current_csv_task = self.make_create_current_csv_task()
 
-        addressbase_check = AddressBaseSourceCheckConstruct(
+        first_letter_data_quality_checks = AddressbaseDataQualityCheckConstruct(
             self,
-            "AddressBaseSourceCheck",
+            "AddressbaseDataQualityChecks",
             athena_query_lambda=self.athena_query_lambda,
-            table_name=current_ballots_joined_to_address_base.table_name,
+            source_table_name=addressbase_cleaned_raw.table_name,
+            target_table_name=current_ballots_joined_to_address_base.table_name,
         )
 
         main_tasks = (
@@ -112,8 +114,8 @@ class CurrentElectionsStack(DataBakerStack):
             )
             .next(parallel_first_letter_task)
             .next(make_partitions)
+            .next(first_letter_data_quality_checks.entry_point)
             .next(parallel_outcodes_task)
-            .next(addressbase_check.entry_point)
         )
 
         self.step_function = SingletonStateMachineConstruct(
