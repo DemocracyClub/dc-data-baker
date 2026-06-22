@@ -20,8 +20,8 @@ from constructs import Construct
 from shared_components.buckets import (
     pollingstations_private_data,
 )
-from shared_components.constructs.addressbase_source_check_construct import (
-    AddressBaseSourceCheckConstruct,
+from shared_components.constructs.addressbase_data_quality_check_construct import (
+    AddressbaseDataQualityCheckConstruct,
 )
 from shared_components.constructs.make_partitions_construct import (
     MakePartitionsConstruct,
@@ -113,11 +113,12 @@ class AddressBaseStack(DataBakerStack):
             target_table_name=addressbase_partitioned.table_name,
         ).entry_point
 
-        addressbase_check = AddressBaseSourceCheckConstruct(
+        data_quality_checks = AddressbaseDataQualityCheckConstruct(
             self,
-            "AddressBaseSourceCheck",
+            "AddressbaseDataQualityChecks",
             athena_query_lambda=self.athena_query_lambda,
-            table_name=addressbase_partitioned.table_name,
+            target_table_name=addressbase_partitioned.table_name,
+            source_table_name=addressbase_cleaned_raw.table_name,
         )
 
         self.state_definition = (
@@ -125,7 +126,7 @@ class AddressBaseStack(DataBakerStack):
             .next(delete_old_objects)
             .next(partition)
             .next(make_partitions)
-            .next(addressbase_check.entry_point)
+            .next(data_quality_checks.entry_point)
         )
 
         self.step_function = sfn.StateMachine(
