@@ -41,10 +41,12 @@ class AddressBaseSourceCheckConstruct(Construct):
     ):
         super().__init__(scope, construct_id, **kwargs)
 
-        # Create the state to count distinct addressbase sources
+        # State names must be unique within a state machine, so they are
+        # namespaced by construct_id to allow more than one instance of this
+        # construct to be used in the same state machine.
         count_distinct_addressbase_source = tasks.LambdaInvoke(
             self,
-            "Count distinct addressbase sources",
+            f"{construct_id}: Count distinct addressbase sources",
             lambda_function=athena_query_lambda,
             payload=sfn.TaskInput.from_object(
                 {
@@ -58,7 +60,7 @@ class AddressBaseSourceCheckConstruct(Construct):
         # Create the state to get Athena query results
         get_addressbase_source_count = tasks.AthenaGetQueryResults(
             self,
-            "Get addressbase sources count",
+            f"{construct_id}: Get addressbase sources count",
             query_execution_id="{% $states.input.Payload.queryExecutionId %}",
             query_language=sfn.QueryLanguage.JSONATA,
             assign={
@@ -68,7 +70,7 @@ class AddressBaseSourceCheckConstruct(Construct):
 
         # Create the state to check if there's exactly one addressbase source
         check_addressbase_source_count = (
-            sfn.Choice(self, "Check addressbase source count")
+            sfn.Choice(self, f"{construct_id}: Check addressbase source count")
             .when(
                 sfn.Condition.string_equals(
                     "$addressbase_source_count",
@@ -76,10 +78,14 @@ class AddressBaseSourceCheckConstruct(Construct):
                 ),
                 sfn.Succeed(
                     self,
-                    "Only one source of addresssbase!",
+                    f"{construct_id}: Only one source of addresssbase!",
                 ),
             )
-            .otherwise(sfn.Fail(self, "Not one source of addresssbase!"))
+            .otherwise(
+                sfn.Fail(
+                    self, f"{construct_id}: Not one source of addresssbase!"
+                )
+            )
         )
 
         # Chain the states together
