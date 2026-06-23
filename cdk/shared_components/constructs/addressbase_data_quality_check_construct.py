@@ -8,8 +8,8 @@ from constructs import Construct
 from shared_components.constructs.addressbase_source_check_construct import (
     AddressBaseSourceCheckConstruct,
 )
-from shared_components.constructs.row_count_check_construct import (
-    RowCountCheckConstruct,
+from shared_components.constructs.uprn_checksum_construct import (
+    UprnChecksumConstruct,
 )
 
 
@@ -19,7 +19,8 @@ class AddressbaseDataQualityCheckConstruct(Construct):
 
     This construct runs two checks in parallel:
     1. Addressbase source check - verifies exactly one distinct addressbase source
-    2. Row count check - verifies the target table has the same row count as addressbase
+    2. UPRN checksum check - verifies the target table holds the same set of
+       UPRNs as the source addressbase table
 
     The workflow succeeds only if both checks pass. If either check fails, the
     entire workflow fails with details about which check(s) failed.
@@ -36,9 +37,9 @@ class AddressbaseDataQualityCheckConstruct(Construct):
     athena_query_lambda : lambda_.IFunction
         The Lambda function that will execute Athena queries
     target_table_name : str
-        The target table to validate (must have addressbase_source column)
+        The target table to validate (must have 'uprn' and 'addressbase_source' columns)
     source_table_name : str
-        The source addressbase table to compare row counts against
+        The source addressbase table to compare against (must have 'uprn' column)
     """
 
     def __init__(
@@ -60,10 +61,10 @@ class AddressbaseDataQualityCheckConstruct(Construct):
             table_name=target_table_name,
         )
 
-        # Create the row count check
-        row_count_check = RowCountCheckConstruct(
+        # Create the UPRN checksum check
+        uprn_checksum_check = UprnChecksumConstruct(
             self,
-            "RowCountCheck",
+            "UprnChecksumCheck",
             athena_query_lambda=athena_query_lambda,
             source_table_name=source_table_name,
             target_table_name=target_table_name,
@@ -73,12 +74,12 @@ class AddressbaseDataQualityCheckConstruct(Construct):
         parallel_checks = sfn.Parallel(
             self,
             "Run data quality checks in parallel",
-            comment="Validates addressbase source uniqueness and row count match",
+            comment="Validate addressbase source uniqueness and UPRN set equality",
         )
 
         # Add both check branches to the parallel state
         parallel_checks.branch(addressbase_source_check.entry_point)
-        parallel_checks.branch(row_count_check.entry_point)
+        parallel_checks.branch(uprn_checksum_check.entry_point)
 
         # Expose the entry point as a property to connect to other state machines
         self.entry_point = parallel_checks
