@@ -24,6 +24,9 @@ from shared_components.constructs.addressbase_data_quality_check_construct impor
 from shared_components.constructs.addressbase_source_check_construct import (
     AddressBaseSourceCheckConstruct,
 )
+from shared_components.constructs.delete_stale_outcodes_construct import (
+    DeleteStaleOutcodesConstruct,
+)
 from shared_components.constructs.make_partitions_construct import (
     MakePartitionsConstruct,
 )
@@ -112,6 +115,19 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             target_table_name=current_boundary_reviews_joined_to_addressbase.table_name,
         )
 
+        delete_stale_outcodes = DeleteStaleOutcodesConstruct(
+            self,
+            "DeleteStaleOutcodes",
+            athena_query_lambda=self.athena_query_lambda,
+            delete_objects_lambda=self.empty_bucket_by_prefix_lambda,
+            source_table_name=current_boundary_reviews_joined_to_addressbase.table_name,
+            target_table_name=current_boundary_reviews_parquet.table_name,
+            dest_bucket_name=current_boundary_reviews_parquet.bucket.bucket_name,
+            dest_path=current_boundary_reviews_parquet.s3_prefix.format(
+                dc_environment=self.dc_environment
+            ),
+        )
+
         outcode_addressbase_source_check = AddressBaseSourceCheckConstruct(
             self,
             "OutcodeAddressbaseSourceCheck",
@@ -137,6 +153,7 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             )
             .next(first_letter_data_quality_checks.entry_point)
             .next(parallel_outcodes_task)
+            .next(delete_stale_outcodes.entry_point)
             .next(outcode_addressbase_source_check.entry_point)
         )
 
