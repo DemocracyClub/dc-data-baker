@@ -21,6 +21,9 @@ from shared_components.buckets import (
 from shared_components.constructs.addressbase_data_quality_check_construct import (
     AddressbaseDataQualityCheckConstruct,
 )
+from shared_components.constructs.addressbase_source_check_construct import (
+    AddressBaseSourceCheckConstruct,
+)
 from shared_components.constructs.make_partitions_construct import (
     MakePartitionsConstruct,
 )
@@ -32,7 +35,7 @@ from shared_components.constructs.step_function_event_queue_construct import (
 )
 from shared_components.models import GlueTable, S3Bucket
 from shared_components.tables import (
-    addressbase_partitioned,
+    addressbase_cleaned_raw,
     addresses_to_boundary_change,
     current_boundary_changes,
     current_boundary_reviews_joined_to_addressbase,
@@ -101,12 +104,19 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             )
         )
 
-        data_quality_checks = AddressbaseDataQualityCheckConstruct(
+        first_letter_data_quality_checks = AddressbaseDataQualityCheckConstruct(
             self,
-            "AddressbaseDataQualityChecks",
+            "FirstLetterAddressbaseDataQualityChecks",
             athena_query_lambda=self.athena_query_lambda,
-            source_table_name=addressbase_partitioned.table_name,
+            source_table_name=addressbase_cleaned_raw.table_name,
             target_table_name=current_boundary_reviews_joined_to_addressbase.table_name,
+        )
+
+        outcode_addressbase_source_check = AddressBaseSourceCheckConstruct(
+            self,
+            "OutcodeAddressbaseSourceCheck",
+            athena_query_lambda=self.athena_query_lambda,
+            table_name=current_boundary_reviews_parquet.table_name,
         )
 
         parallel_outcodes_task = self.make_parallel_outcodes_task()
@@ -125,8 +135,9 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             .next(
                 make_current_boundary_reviews_joined_to_addressbase_partitions
             )
-            .next(data_quality_checks.entry_point)
+            .next(first_letter_data_quality_checks.entry_point)
             .next(parallel_outcodes_task)
+            .next(outcode_addressbase_source_check.entry_point)
         )
 
         self.step_function = SingletonStateMachineConstruct(
