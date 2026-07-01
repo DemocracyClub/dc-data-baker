@@ -78,12 +78,12 @@ class AddressBaseSourceCheckConstruct(Construct):
                 ),
                 sfn.Succeed(
                     self,
-                    f"{construct_id}: Only one source of addresssbase!",
+                    f"{construct_id}: Only one source of addressbase!",
                 ),
             )
             .otherwise(
                 sfn.Fail(
-                    self, f"{construct_id}: Not one source of addresssbase!"
+                    self, f"{construct_id}: Not one source of addressbase!"
                 )
             )
         )
