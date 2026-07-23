@@ -55,7 +55,7 @@ def export_sql():
                 JOIN organisations_organisation o ON o.id = obr.organisation_id
                 JOIN organisations_organisationgeography og ON og.organisation_id = o.id
             WHERE
-                obr.id IN (963, 964)
+                obr.public_visibility != 'HIDDEN'
         )
     SELECT
         r.slug,
