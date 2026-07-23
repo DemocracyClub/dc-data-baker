@@ -56,6 +56,18 @@ def export_sql():
                 JOIN organisations_organisationgeography og ON og.organisation_id = o.id
             WHERE
                 obr.public_visibility != 'HIDDEN'
+                AND NOT EXISTS (
+                    SELECT
+                        e.election_id,
+                        e.poll_open_date
+                    FROM
+                        elections_election e
+                    WHERE
+                        e.organisation_id = o.id
+                        AND e.poll_open_date BETWEEN obr.effective_date AND CURRENT_DATE  - INTERVAL '20 days'
+                    LIMIT
+                        1
+                )
         )
     SELECT
         r.slug,
