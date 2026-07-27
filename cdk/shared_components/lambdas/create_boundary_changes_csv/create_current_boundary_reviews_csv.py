@@ -49,7 +49,17 @@ def export_sql():
                         ds.end_date DESC NULLS LAST
                     LIMIT
                         1
-                ) AS old_divisionset_id
+                ) AS old_divisionset_id,
+                (
+                    SELECT
+                        array_agg(e.election_id)
+                    FROM
+                        elections_election e
+                    WHERE
+                        e.organisation_id = o.id
+                        AND e.group_type IS NULL
+                        AND e.poll_open_date = obr.effective_date
+                ) as review_related_ballots
             FROM
                 organisations_organisationboundaryreview obr
                 JOIN organisations_organisation o ON o.id = obr.organisation_id
@@ -87,6 +97,21 @@ def export_sql():
         d.name AS division_name,
         d.official_identifier AS division_official_identifier,
         st_astext (dgs.geography) AS division_boundary_wkt,
+        CASE
+            WHEN ds.id = r.old_divisionset_id THEN NULL
+            WHEN ds.id = r.new_divisionset_id THEN COALESCE(
+                (
+                    SELECT
+                        json_agg(b)::text
+                    FROM
+                        unnest(r.review_related_ballots) AS b
+                    WHERE
+                        b ~* d.slug
+                ),
+                '[]'
+            )
+            ELSE NULL
+        END AS division_related_ballots,
         r.boundary_review_id,
         CASE
             WHEN ds.id = r.old_divisionset_id THEN 'old'

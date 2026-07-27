@@ -116,6 +116,7 @@ current_boundary_changes = GlueTable(
         "division_name": glue.Schema.STRING,
         "division_official_identifier": glue.Schema.STRING,
         "division_boundary_wkt": glue.Schema.STRING,
+        "division_related_ballots": glue.Schema.STRING,
     },
     partition_keys=[
         glue.Column(
