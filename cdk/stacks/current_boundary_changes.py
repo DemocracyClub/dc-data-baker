@@ -233,7 +233,9 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             payload=sfn.TaskInput.from_object(
                 {
                     "s3_bucket": current_boundary_changes.bucket.bucket_name,
-                    "s3_prefix": current_boundary_changes.s3_prefix,
+                    "s3_prefix": current_boundary_changes.s3_prefix.format(
+                        **self.context
+                    ),
                 }
             ),
         )
