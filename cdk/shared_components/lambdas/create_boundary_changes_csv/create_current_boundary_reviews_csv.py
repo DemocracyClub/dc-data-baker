@@ -49,17 +49,7 @@ def export_sql():
                         ds.end_date DESC NULLS LAST
                     LIMIT
                         1
-                ) AS old_divisionset_id,
-                (
-                    SELECT
-                        array_agg(e.election_id)
-                    FROM
-                        elections_election e
-                    WHERE
-                        e.organisation_id = o.id
-                        AND e.group_type IS NULL
-                        AND e.poll_open_date = obr.effective_date
-                ) as review_related_ballots
+                ) AS old_divisionset_id
             FROM
                 organisations_organisationboundaryreview obr
                 JOIN organisations_organisation o ON o.id = obr.organisation_id
@@ -102,11 +92,13 @@ def export_sql():
             WHEN ds.id = r.new_divisionset_id THEN COALESCE(
                 (
                     SELECT
-                        json_agg(b)::text
+                        json_agg(e.election_id)::text
                     FROM
-                        unnest(r.review_related_ballots) AS b
+                        elections_election AS e
                     WHERE
-                        b ~* d.slug
+                        e.division_id = d.id
+                        AND d.divisionset_id = r.new_divisionset_id
+                        AND e.poll_open_date = r.effective_date
                 ),
                 '[]'
             )
