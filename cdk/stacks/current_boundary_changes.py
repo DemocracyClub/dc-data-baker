@@ -89,6 +89,10 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             current_boundary_changes
         )
 
+        current_boundary_changes_csv_quality_check = (
+            self.make_current_boundary_changes_csv_quality_check()
+        )
+
         boundary_review_pairs_map = self.make_boundary_review_pairs_map()
 
         make_addresses_to_boundary_change_partitions = (
@@ -142,6 +146,7 @@ class CurrentBoundaryChangesStack(DataBakerStack):
                 create_current_boundary_changes_csv_task
             )
             .next(make_current_boundary_changes_partitions)
+            .next(current_boundary_changes_csv_quality_check)
             .next(boundary_review_pairs_map)
             .next(make_addresses_to_boundary_change_partitions)
             .next(
@@ -238,6 +243,71 @@ class CurrentBoundaryChangesStack(DataBakerStack):
                     ),
                 }
             ),
+        )
+
+    def make_current_boundary_changes_csv_quality_check(
+        self,
+    ) -> sfn.Chain:
+        division_ballots_query = tasks.LambdaInvoke(
+            self,
+            "Get divison ballots with more than one ballot",
+            lambda_function=self.athena_query_lambda,
+            payload=sfn.TaskInput.from_object(
+                {
+                    "context": {
+                        "table_name": current_boundary_changes.table_name
+                    },
+                    "QueryString": "SELECT DISTINCT division_official_identifier, json_array_length(json_parse(division_related_ballots)) as division_ballot_count FROM {table_name} WHERE divisionset_generation = 'new' AND json_array_length(json_parse(division_related_ballots)) > 1;",
+                    "blocking": True,
+                }
+            ),
+        )
+
+        # get results of above Athena query
+        get_division_ballots_query_result = tasks.AthenaGetQueryResults(
+            self,
+            "Get divison ballots with more than one ballot results",
+            query_execution_id="{% $states.input.Payload.queryExecutionId %}",
+            query_language=sfn.QueryLanguage.JSONATA,
+        )
+        # drop the header row
+        remove_headers = sfn.Pass(
+            self,
+            "Drop header from division ballots query results",
+            parameters={
+                "divisions_and_counts": sfn.JsonPath.string_at(
+                    "$.ResultSet.Rows[1:]"
+                ),
+            },
+        )
+        count_results = sfn.Pass(
+            self,
+            "Count division ballots query results rows",
+            query_language=sfn.QueryLanguage.JSONATA,
+            outputs={
+                "divisions_and_counts_length": "{% $count($states.input.divisions_and_counts) %}",
+            },
+        )
+        # check each division has exactly one ballot
+        check_results_count = (
+            sfn.Choice(self, "Check No divisions have more than one ballot")
+            .when(
+                sfn.Condition.number_equals("$.divisions_and_counts_length", 0),
+                sfn.Pass(
+                    self,
+                    "No divisions have more than one ballot!",
+                ),
+            )
+            .otherwise(
+                sfn.Fail(self, "Some divisions have more than one ballot :(")
+            )
+        )
+
+        return (
+            division_ballots_query.next(get_division_ballots_query_result)
+            .next(remove_headers)
+            .next(count_results)
+            .next(check_results_count.afterwards())
         )
 
     def make_partitions_task(self, table) -> tasks.LambdaInvoke:
