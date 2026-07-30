@@ -96,7 +96,8 @@ def export_sql():
                     FROM
                         elections_election AS e
                     WHERE
-                        e.division_id = d.id
+                        e.current_status  = 'Approved'
+                        AND e.division_id = d.id
                         AND d.divisionset_id = r.new_divisionset_id
                         AND e.poll_open_date = r.effective_date
                 ),
