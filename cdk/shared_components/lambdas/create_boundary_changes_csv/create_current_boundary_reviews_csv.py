@@ -58,13 +58,15 @@ def export_sql():
                 obr.public_visibility != 'HIDDEN'
                 AND NOT EXISTS (
                     SELECT
-                        e.election_id,
-                        e.poll_open_date
+                        e.election_id
                     FROM
                         elections_election e
                     WHERE
-                        e.organisation_id = o.id
-                        AND e.poll_open_date BETWEEN obr.effective_date AND CURRENT_DATE  - INTERVAL '20 days'
+                        e.current_status = 'Approved'
+                        AND e.current IS NOT TRUE
+                        AND e.organisation_id = o.id
+                        AND e.poll_open_date >= obr.effective_date
+                        AND e.poll_open_date <= CURRENT_DATE  - INTERVAL '20 days'
                     LIMIT
                         1
                 )
