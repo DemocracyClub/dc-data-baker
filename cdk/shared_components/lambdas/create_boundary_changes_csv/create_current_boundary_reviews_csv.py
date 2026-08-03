@@ -63,6 +63,7 @@ def export_sql():
                         elections_election e
                     WHERE
                         e.current_status = 'Approved'
+                        AND NOT e.cancelled
                         AND e.current IS NOT TRUE
                         AND e.organisation_id = o.id
                         AND e.poll_open_date >= obr.effective_date
@@ -99,6 +100,7 @@ def export_sql():
                         elections_election AS e
                     WHERE
                         e.current_status  = 'Approved'
+                        AND not e.cancelled
                         AND e.division_id = d.id
                         AND d.divisionset_id = r.new_divisionset_id
                         AND e.poll_open_date = r.effective_date
