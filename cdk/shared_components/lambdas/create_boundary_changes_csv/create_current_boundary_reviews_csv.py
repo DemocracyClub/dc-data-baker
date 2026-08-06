@@ -55,7 +55,22 @@ def export_sql():
                 JOIN organisations_organisation o ON o.id = obr.organisation_id
                 JOIN organisations_organisationgeography og ON og.organisation_id = o.id
             WHERE
-                obr.id IN (963, 964)
+                obr.public_visibility != 'HIDDEN'
+                AND NOT EXISTS (
+                    SELECT
+                        e.election_id
+                    FROM
+                        elections_election e
+                    WHERE
+                        e.current_status = 'Approved'
+                        AND NOT e.cancelled
+                        AND e.current IS NOT TRUE
+                        AND e.organisation_id = o.id
+                        AND e.poll_open_date >= obr.effective_date
+                        AND e.poll_open_date <= CURRENT_DATE  - INTERVAL '20 days'
+                    LIMIT
+                        1
+                )
         )
     SELECT
         r.slug,
@@ -75,6 +90,25 @@ def export_sql():
         d.name AS division_name,
         d.official_identifier AS division_official_identifier,
         st_astext (dgs.geography) AS division_boundary_wkt,
+        CASE
+            WHEN ds.id = r.old_divisionset_id THEN NULL
+            WHEN ds.id = r.new_divisionset_id THEN COALESCE(
+                (
+                    SELECT
+                        json_agg(e.election_id)::text
+                    FROM
+                        elections_election AS e
+                    WHERE
+                        e.current_status  = 'Approved'
+                        AND not e.cancelled
+                        AND e.division_id = d.id
+                        AND d.divisionset_id = r.new_divisionset_id
+                        AND e.poll_open_date = r.effective_date
+                ),
+                '[]'
+            )
+            ELSE NULL
+        END AS division_related_ballots,
         r.boundary_review_id,
         CASE
             WHEN ds.id = r.old_divisionset_id THEN 'old'

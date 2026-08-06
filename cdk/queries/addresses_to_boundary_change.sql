@@ -5,6 +5,7 @@ UNLOAD (
                 division_slug,
                 division_name,
                 division_official_identifier,
+                division_related_ballots,
                 boundary_review_id,
                 division_type,
                 division_boundary_wkt,
@@ -43,6 +44,7 @@ UNLOAD (
                 nd.division_slug AS new_division_slug,
                 nd.division_name AS new_division_name,
                 nd.division_official_identifier AS new_division_official_identifier,
+                nd.division_related_ballots AS related_ballots,
                 od.consultation_url,
                 od.legislation_title,
                 od.effective_date,
@@ -110,8 +112,9 @@ UNLOAD (
                 a.organisation_name,
                 a.organisation_official_name,
                 a.organisation_gss,
-            bts.old_division_slug IS NOT NULL AS boundary_same,
-            nts.old_division_slug IS NOT NULL AS name_same
+                a.related_ballots AS related_ballots,
+                bts.old_division_slug IS NOT NULL AS boundary_same,
+                nts.old_division_slug IS NOT NULL AS name_same
         FROM addresses a
         LEFT JOIN boundaries_the_same bts
             ON a.old_division_slug = bts.old_division_slug
@@ -128,7 +131,7 @@ UNLOAD (
         division_type,
         boundary_review_id,
         MAP(
-            ARRAY['division_type', 'old_division_slug', 'old_division_name', 'old_division_official_identifier', 'old_divisionset_pmtiles_url', 'new_division_slug', 'new_division_name', 'new_division_official_identifier', 'new_divisionset_pmtiles_url', 'change_scenario'],
+            ARRAY['division_type', 'old_division_slug', 'old_division_name', 'old_division_official_identifier', 'old_divisionset_pmtiles_url', 'new_division_slug', 'new_division_name', 'new_division_official_identifier', 'new_divisionset_pmtiles_url', 'related_ballots', 'change_scenario'],
             ARRAY[
                 division_type,
                 old_division_slug,
@@ -139,6 +142,7 @@ UNLOAD (
                 new_division_name,
                 new_division_official_identifier,
                 new_divisionset_pmtiles_url,
+                related_ballots,
                 CASE
                     WHEN boundary_same AND name_same THEN 'NO_CHANGE'
                     WHEN boundary_same AND NOT name_same THEN 'NAME_CHANGED'
