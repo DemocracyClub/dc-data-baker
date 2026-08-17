@@ -141,6 +141,16 @@ containing one row per address and for each, a list of ballot IDs.
 
 This can be used to look up current elections in other applications.
 
+## CurrentBoundaryChanges Layer
+
+Performs a geo-join on the AddressBase layer and a CSV of current boundary
+reviews per division WKT.
+
+At the end of the process, a parquet file per outcode is produced,
+containing one row per address and for each, a list of boundary reviews with associated boundary changes.
+
+This can be used to look up current boundary changes in other applications.
+
 ## Adding new layers
 
 A layer is really a CDK stack. To make a new layer, make a stack and drive
