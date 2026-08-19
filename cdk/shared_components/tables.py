@@ -193,22 +193,3 @@ current_boundary_reviews_joined_to_addressbase = GlueTable(
         context={},
     ),
 )
-
-current_boundary_reviews_parquet = GlueTable(
-    table_name="current_boundary_reviews_parquet",
-    description="The final product of the current boundary changes layer. A list of UPRNs with current boundary reviews grouped by outcode",
-    s3_prefix="addressbase/{dc_environment}/current_boundary_reviews_parquet",
-    bucket=pollingstations_private_data,
-    database=dc_data_baker,
-    data_format=glue.DataFormat.PARQUET,
-    columns={
-        "uprn": glue.Schema.STRING,
-        "address": glue.Schema.STRING,
-        "postcode": glue.Schema.STRING,
-        "addressbase_source": glue.Schema.STRING,
-        "boundary_reviews": glue.Schema.array(
-            input_string="string", is_primitive=True
-        ),
-        "outcode": glue.Schema.STRING,
-    },
-)

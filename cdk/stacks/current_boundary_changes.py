@@ -5,10 +5,7 @@ from aws_cdk import (
     CfnOutput,
     Duration,
     Fn,
-    aws_events,
-    aws_events_targets,
     aws_lambda,
-    aws_sqs,
 )
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_stepfunctions as sfn
@@ -21,20 +18,11 @@ from shared_components.buckets import (
 from shared_components.constructs.addressbase_data_quality_check_construct import (
     AddressbaseDataQualityCheckConstruct,
 )
-from shared_components.constructs.addressbase_source_check_construct import (
-    AddressBaseSourceCheckConstruct,
-)
-from shared_components.constructs.delete_stale_outcodes_construct import (
-    DeleteStaleOutcodesConstruct,
-)
 from shared_components.constructs.make_partitions_construct import (
     MakePartitionsConstruct,
 )
 from shared_components.constructs.singleton_state_machine_construct import (
     SingletonStateMachineConstruct,
-)
-from shared_components.constructs.step_function_event_queue_construct import (
-    StepFunctionEventQueueConstruct,
 )
 from shared_components.models import GlueTable, S3Bucket
 from shared_components.tables import (
@@ -42,7 +30,6 @@ from shared_components.tables import (
     addresses_to_boundary_change,
     current_boundary_changes,
     current_boundary_reviews_joined_to_addressbase,
-    current_boundary_reviews_parquet,
 )
 from stacks.base_stack import DataBakerStack
 
@@ -119,28 +106,6 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             target_table_name=current_boundary_reviews_joined_to_addressbase.table_name,
         )
 
-        delete_stale_outcodes = DeleteStaleOutcodesConstruct(
-            self,
-            "DeleteStaleOutcodes",
-            athena_query_lambda=self.athena_query_lambda,
-            delete_objects_lambda=self.empty_bucket_by_prefix_lambda,
-            source_table_name=current_boundary_reviews_joined_to_addressbase.table_name,
-            target_table_name=current_boundary_reviews_parquet.table_name,
-            dest_bucket_name=current_boundary_reviews_parquet.bucket.bucket_name,
-            dest_path=current_boundary_reviews_parquet.s3_prefix.format(
-                dc_environment=self.dc_environment
-            ),
-        )
-
-        outcode_addressbase_source_check = AddressBaseSourceCheckConstruct(
-            self,
-            "OutcodeAddressbaseSourceCheck",
-            athena_query_lambda=self.athena_query_lambda,
-            table_name=current_boundary_reviews_parquet.table_name,
-        )
-
-        parallel_outcodes_task = self.make_parallel_outcodes_task()
-
         main_tasks = (
             delete_old_current_boundary_changes_task.next(
                 create_current_boundary_changes_csv_task
@@ -157,9 +122,6 @@ class CurrentBoundaryChangesStack(DataBakerStack):
                 make_current_boundary_reviews_joined_to_addressbase_partitions
             )
             .next(first_letter_data_quality_checks.entry_point)
-            .next(parallel_outcodes_task)
-            .next(delete_stale_outcodes.entry_point)
-            .next(outcode_addressbase_source_check.entry_point)
         )
 
         self.step_function = SingletonStateMachineConstruct(
@@ -168,8 +130,6 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             step_function_name="MakeCurrentBoundaryChangesParquet",
             main_tasks=main_tasks,
         ).entry_point
-
-        self.make_event_triggers()
 
         CfnOutput(
             self,
@@ -188,7 +148,6 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             current_boundary_changes,
             addresses_to_boundary_change,
             current_boundary_reviews_joined_to_addressbase,
-            current_boundary_reviews_parquet,
         ]
 
     def make_delete_old_current_boundary_changes_task(
@@ -452,81 +411,5 @@ class CurrentBoundaryChangesStack(DataBakerStack):
                     "QueryName": current_boundary_reviews_joined_to_addressbase.populated_with.name,
                     "blocking": True,
                 }
-            ),
-        )
-
-    def make_parallel_outcodes_task(self) -> sfn.Parallel:
-        parallel_outcodes = sfn.Parallel(
-            self, "Make outcode parquet per first letter"
-        )
-        alphabet = [chr(i) for i in range(ord("A"), ord("Z") + 1)]
-        for letter in alphabet:
-            context = current_boundary_reviews_joined_to_addressbase.populated_with.context.copy()
-            context["first_letter"] = letter
-
-            parallel_outcodes.branch(
-                tasks.LambdaInvoke(
-                    self,
-                    f"Make outcode parquet for {letter}",
-                    lambda_function=self.first_letter_to_outcode_parquet_lambda,
-                    payload=sfn.TaskInput.from_object(
-                        {
-                            "first_letter": letter,
-                            "source_bucket_name": current_boundary_reviews_joined_to_addressbase.bucket.bucket_name,
-                            "source_path": current_boundary_reviews_joined_to_addressbase.s3_prefix.format(
-                                dc_environment=self.dc_environment
-                            ),
-                            "dest_bucket_name": current_boundary_reviews_parquet.bucket.bucket_name,
-                            "dest_path": current_boundary_reviews_parquet.s3_prefix.format(
-                                dc_environment=self.dc_environment
-                            ),
-                            "filter_column": "boundary_reviews",
-                        }
-                    ),
-                )
-            )
-        return parallel_outcodes
-
-    def make_event_triggers(self):
-        event_queue = StepFunctionEventQueueConstruct(
-            self,
-            "MakeCurrentBoundaryChangesEventQueue",
-            target_step_function=self.step_function,
-            queue_name="CurrentBoundaryChangesEventQueue",
-            pipe_name="RunCurrentBoundaryChangesBuilder",
-        ).entry_point
-        self.make_run_nightly_rule(event_queue)
-        self.make_rebuild_boundary_changes_parquet_rule(event_queue)
-
-    def make_run_nightly_rule(self, event_queue: aws_sqs.IQueue):
-        one_am = aws_events.Schedule.cron(minute="0", hour="1")
-        run_nightly_rule = aws_events.Rule(
-            self, "RebuildCurrentBoundaryChangesNightlyTrigger", schedule=one_am
-        )
-        run_nightly_rule.add_target(
-            aws_events_targets.SqsQueue(
-                event_queue,
-                message=aws_events.RuleTargetInput.from_text("Nightly re-run"),
-                message_group_id="boundary_change_set_changed",
-            )
-        )
-
-    def make_rebuild_boundary_changes_parquet_rule(
-        self, event_queue: aws_sqs.IQueue
-    ):
-        aws_events.Rule(
-            self,
-            "RebuildCurrentBoundaryChangesTrigger",
-            targets=[
-                aws_events_targets.SqsQueue(
-                    event_queue,
-                    message_group_id="boundary_change_set_changed",
-                ),
-            ],
-            event_pattern=aws_events.EventPattern(
-                detail_type=[
-                    "boundary_change_set_changed",
-                    "elections_set_changed",  # Not all election set changes are relevant to boundary changes, but its easier to include all than filter
-                ]
             ),
         )
