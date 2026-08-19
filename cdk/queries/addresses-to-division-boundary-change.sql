@@ -17,7 +17,7 @@ UNLOAD (
                 organisation_name,
                 organisation_official_name,
                 organisation_gss
-            FROM current_boundary_changes
+            FROM current_division_boundary_changes
             WHERE
                 boundary_review_id = {boundary_review_id}
                 AND division_type = '{division_type}'

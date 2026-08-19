@@ -91,8 +91,8 @@ current_ballots_joined_to_address_base = GlueTable(
 )
 
 
-current_boundary_changes = GlueTable(
-    table_name="current_boundary_changes",
+current_division_boundary_changes = GlueTable(
+    table_name="current_division_boundary_changes",
     description="A list of boundary changes with a WKT",
     s3_prefix="{dc_environment}/current_boundary_reviews_with_wkt",
     bucket=data_baker_results_bucket,
@@ -134,10 +134,10 @@ current_boundary_changes = GlueTable(
     ],
 )
 
-addresses_to_boundary_change = GlueTable(
-    table_name="addresses_to_boundary_change",
+addresses_to_division_boundary_change = GlueTable(
+    table_name="addresses_to_division_boundary_change",
     description="Address to single boundary change",
-    s3_prefix="addressbase/{dc_environment}/addresses_to_boundary_change/",
+    s3_prefix="addressbase/{dc_environment}/addresses_to_division_boundary_change/",
     bucket=pollingstations_private_data,
     database=dc_data_baker,
     data_format=glue.DataFormat.PARQUET,
@@ -160,7 +160,7 @@ addresses_to_boundary_change = GlueTable(
         ),
     },
     populated_with=BaseQuery(
-        name="addresses_to_boundary_change.sql",
+        name="addresses-to-division-boundary-change.sql",
         context={},
     ),
 )

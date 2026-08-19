@@ -27,14 +27,14 @@ from shared_components.constructs.singleton_state_machine_construct import (
 from shared_components.models import GlueTable, S3Bucket
 from shared_components.tables import (
     addressbase_cleaned_raw,
-    addresses_to_boundary_change,
-    current_boundary_changes,
+    addresses_to_division_boundary_change,
     current_boundary_reviews_joined_to_addressbase,
+    current_division_boundary_changes,
 )
 from stacks.base_stack import DataBakerStack
 
 
-class CurrentBoundaryChangesStack(DataBakerStack):
+class CurrentDivisionBoundaryChangesStack(DataBakerStack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
         self.athena_query_lambda_arn = Fn.import_value(
@@ -64,26 +64,26 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             )
         )
 
-        delete_old_current_boundary_changes_task = (
-            self.make_delete_old_current_boundary_changes_task()
+        delete_old_current_division_boundary_changes_task = (
+            self.make_delete_old_current_division_boundary_changes_task()
         )
 
-        create_current_boundary_changes_csv_task = (
-            self.make_current_boundary_changes_csv_task()
+        create_current_division_boundary_changes_csv_task = (
+            self.make_current_division_boundary_changes_csv_task()
         )
 
-        make_current_boundary_changes_partitions = self.make_partitions_task(
-            current_boundary_changes
+        make_current_division_boundary_changes_partitions = (
+            self.make_partitions_task(current_division_boundary_changes)
         )
 
-        current_boundary_changes_csv_quality_check = (
-            self.make_current_boundary_changes_csv_quality_check()
+        current_division_boundary_changes_csv_quality_check = (
+            self.make_current_division_boundary_changes_csv_quality_check()
         )
 
         boundary_review_pairs_map = self.make_boundary_review_pairs_map()
 
-        make_addresses_to_boundary_change_partitions = (
-            self.make_partitions_task(addresses_to_boundary_change)
+        make_addresses_to_division_boundary_change_partitions = (
+            self.make_partitions_task(addresses_to_division_boundary_change)
         )
 
         delete_old_current_boundary_reviews_joined_to_addressbase_task = self.make_delete_old_current_boundary_reviews_joined_to_addressbase_task()
@@ -107,13 +107,13 @@ class CurrentBoundaryChangesStack(DataBakerStack):
         )
 
         main_tasks = (
-            delete_old_current_boundary_changes_task.next(
-                create_current_boundary_changes_csv_task
+            delete_old_current_division_boundary_changes_task.next(
+                create_current_division_boundary_changes_csv_task
             )
-            .next(make_current_boundary_changes_partitions)
-            .next(current_boundary_changes_csv_quality_check)
+            .next(make_current_division_boundary_changes_partitions)
+            .next(current_division_boundary_changes_csv_quality_check)
             .next(boundary_review_pairs_map)
-            .next(make_addresses_to_boundary_change_partitions)
+            .next(make_addresses_to_division_boundary_change_partitions)
             .next(
                 delete_old_current_boundary_reviews_joined_to_addressbase_task
             )
@@ -126,16 +126,16 @@ class CurrentBoundaryChangesStack(DataBakerStack):
 
         self.step_function = SingletonStateMachineConstruct(
             self,
-            "MakeCurrentBoundaryChangesParquet",
-            step_function_name="MakeCurrentBoundaryChangesParquet",
+            "MakeCurrentDivisionBoundaryChangesParquet",
+            step_function_name="MakeCurrentDivisionBoundaryChangesParquet",
             main_tasks=main_tasks,
         ).entry_point
 
         CfnOutput(
             self,
-            "MakeCurrentBoundaryChangesParquetArnOutput",
+            "MakeCurrentDivisionBoundaryChangesParquetArnOutput",
             value=self.step_function.state_machine_arn,
-            export_name="MakeCurrentBoundaryChangesParquetArn",
+            export_name="MakeCurrentDivisionBoundaryChangesParquetArn",
         )
 
     @staticmethod
@@ -145,12 +145,12 @@ class CurrentBoundaryChangesStack(DataBakerStack):
     @staticmethod
     def glue_tables() -> List[GlueTable]:
         return [
-            current_boundary_changes,
-            addresses_to_boundary_change,
+            current_division_boundary_changes,
+            addresses_to_division_boundary_change,
             current_boundary_reviews_joined_to_addressbase,
         ]
 
-    def make_delete_old_current_boundary_changes_task(
+    def make_delete_old_current_division_boundary_changes_task(
         self,
     ) -> tasks.LambdaInvoke:
         return tasks.LambdaInvoke(
@@ -159,19 +159,21 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             lambda_function=self.empty_bucket_by_prefix_lambda,
             payload=sfn.TaskInput.from_object(
                 {
-                    "bucket": current_boundary_changes.bucket.bucket_name,
-                    "prefix": current_boundary_changes.s3_prefix.format(
+                    "bucket": current_division_boundary_changes.bucket.bucket_name,
+                    "prefix": current_division_boundary_changes.s3_prefix.format(
                         **self.context
                     ),
                 }
             ),
         )
 
-    def make_current_boundary_changes_csv_task(self) -> tasks.LambdaInvoke:
-        create_current_boundary_changes_csv_function = aws_lambda_python.PythonFunction(
+    def make_current_division_boundary_changes_csv_task(
+        self,
+    ) -> tasks.LambdaInvoke:
+        create_current_division_boundary_changes_csv_function = aws_lambda_python.PythonFunction(
             self,
-            "create_current_boundary_changes_csv",
-            function_name="create_current_boundary_changes_csv",
+            "create_current_division_boundary_changes_csv",
+            function_name="create_current_division_boundary_changes_csv",
             runtime=aws_lambda.Runtime.PYTHON_3_12,
             handler="handler",
             entry="cdk/shared_components/lambdas/create_boundary_changes_csv",
@@ -180,7 +182,7 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             memory_size=2048,
         )
 
-        create_current_boundary_changes_csv_function.add_to_role_policy(
+        create_current_division_boundary_changes_csv_function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "ssm:*",
@@ -193,18 +195,18 @@ class CurrentBoundaryChangesStack(DataBakerStack):
         return tasks.LambdaInvoke(
             self,
             "Make current boundary changes CSV",
-            lambda_function=create_current_boundary_changes_csv_function,
+            lambda_function=create_current_division_boundary_changes_csv_function,
             payload=sfn.TaskInput.from_object(
                 {
-                    "s3_bucket": current_boundary_changes.bucket.bucket_name,
-                    "s3_prefix": current_boundary_changes.s3_prefix.format(
+                    "s3_bucket": current_division_boundary_changes.bucket.bucket_name,
+                    "s3_prefix": current_division_boundary_changes.s3_prefix.format(
                         **self.context
                     ),
                 }
             ),
         )
 
-    def make_current_boundary_changes_csv_quality_check(
+    def make_current_division_boundary_changes_csv_quality_check(
         self,
     ) -> sfn.Chain:
         division_ballots_query = tasks.LambdaInvoke(
@@ -214,7 +216,7 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             payload=sfn.TaskInput.from_object(
                 {
                     "context": {
-                        "table_name": current_boundary_changes.table_name
+                        "table_name": current_division_boundary_changes.table_name
                     },
                     "QueryString": "SELECT DISTINCT division_official_identifier, json_array_length(json_parse(division_related_ballots)) as division_ballot_count FROM {table_name} WHERE divisionset_generation = 'new' AND json_array_length(json_parse(division_related_ballots)) > 1;",
                     "blocking": True,
@@ -280,20 +282,20 @@ class CurrentBoundaryChangesStack(DataBakerStack):
     def make_boundary_review_pairs_map(self) -> sfn.Chain:
         """
         Creates a workflow that:
-        1. Deletes old data from addresses_to_boundary_change table
+        1. Deletes old data from addresses_to_division_boundary_change table
         2. Queries for unique boundary_review_id and division_type pairs
         3. Gets the query results
-        4. Maps over each pair to run the addresses_to_boundary_change query
+        4. Maps over each pair to run the addresses_to_division_boundary_change query
         """
         # Delete old data
-        delete_old_addresses_to_boundary_change = tasks.LambdaInvoke(
+        delete_old_addresses_to_division_boundary_change = tasks.LambdaInvoke(
             self,
-            "Remove old addresses_to_boundary_change data from S3",
+            "Remove old addresses_to_division_boundary_change data from S3",
             lambda_function=self.empty_bucket_by_prefix_lambda,
             payload=sfn.TaskInput.from_object(
                 {
-                    "bucket": addresses_to_boundary_change.bucket.bucket_name,
-                    "prefix": addresses_to_boundary_change.s3_prefix.format(
+                    "bucket": addresses_to_division_boundary_change.bucket.bucket_name,
+                    "prefix": addresses_to_division_boundary_change.s3_prefix.format(
                         **self.context
                     ),
                 }
@@ -308,7 +310,7 @@ class CurrentBoundaryChangesStack(DataBakerStack):
             payload=sfn.TaskInput.from_object(
                 {
                     "context": {
-                        "table_name": current_boundary_changes.table_name
+                        "table_name": current_division_boundary_changes.table_name
                     },
                     "QueryString": """
                         SELECT DISTINCT
@@ -341,7 +343,7 @@ class CurrentBoundaryChangesStack(DataBakerStack):
 
         # Map task - process each pair
         # Each item will be a row from Athena: {"Data": [{"VarCharValue": "963"}, {"VarCharValue": "WAC"}]}
-        # Pass it to the lambda that can run the athena query that populates 'addresses_to_boundary_change' table
+        # Pass it to the lambda that can run the athena query that populates 'addresses_to_division_boundary_change' table
         process_pair_task = tasks.LambdaInvoke(
             self,
             "Create Address to Boundary Review for Review/Division Type pair",
@@ -356,7 +358,7 @@ class CurrentBoundaryChangesStack(DataBakerStack):
                             "$.Data[1].VarCharValue"
                         ),
                     },
-                    "QueryName": addresses_to_boundary_change.populated_with.name,
+                    "QueryName": addresses_to_division_boundary_change.populated_with.name,
                     "blocking": True,
                 }
             ),
@@ -374,7 +376,7 @@ class CurrentBoundaryChangesStack(DataBakerStack):
 
         # Chain the states together
         return (
-            sfn.Chain.start(delete_old_addresses_to_boundary_change)
+            sfn.Chain.start(delete_old_addresses_to_division_boundary_change)
             .next(get_unique_pairs)
             .next(get_pairs_results)
             .next(transform_results)
