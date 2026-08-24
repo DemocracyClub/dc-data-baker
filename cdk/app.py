@@ -4,6 +4,9 @@ import os
 
 from aws_cdk import App, Environment, Tags
 from stacks.addressbase import AddressBaseStack
+from stacks.current_boundary_changes_coordinator import (
+    CurrentBoundaryChangesCoordinatorStack,
+)
 from stacks.current_division_boundary_changes import (
     CurrentDivisionBoundaryChangesStack,
 )
@@ -53,6 +56,12 @@ CurrentElectionsStack(
 CurrentDivisionBoundaryChangesStack(
     app,
     "CurrentDivisionBoundaryChangesStack",
+    env=env,
+)
+
+CurrentBoundaryChangesCoordinatorStack(
+    app,
+    "CurrentBoundaryChangesCoordinatorStack",
     env=env,
 )
 
