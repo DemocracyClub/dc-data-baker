@@ -25,8 +25,8 @@ from shared_components.models import GlueTable, S3Bucket
 from shared_components.tables import (
     addressbase_cleaned_raw,
     addresses_to_division_boundary_change,
-    current_boundary_reviews_joined_to_addressbase,
     current_division_boundary_changes,
+    current_mappable_boundary_reviews_joined_to_addressbase,
 )
 from stacks.base_stack import DataBakerStack
 
@@ -66,16 +66,12 @@ class CurrentDivisionBoundaryChangesStack(DataBakerStack):
             self.make_partitions_task(addresses_to_division_boundary_change)
         )
 
-        delete_old_current_boundary_reviews_joined_to_addressbase_task = self.make_delete_old_current_boundary_reviews_joined_to_addressbase_task()
+        delete_old_current_mappable_boundary_reviews_joined_to_addressbase_task = self.make_delete_old_current_mappable_boundary_reviews_joined_to_addressbase_task()
 
-        make_current_boundary_reviews_joined_to_addressbase_task = (
-            self.make_current_boundary_reviews_joined_to_addressbase_task()
-        )
+        make_current_mappable_boundary_reviews_joined_to_addressbase_task = self.make_current_mappable_boundary_reviews_joined_to_addressbase_task()
 
-        make_current_boundary_reviews_joined_to_addressbase_partitions = (
-            self.make_partitions_task(
-                current_boundary_reviews_joined_to_addressbase
-            )
+        make_current_mappable_boundary_reviews_joined_to_addressbase_partitions = self.make_partitions_task(
+            current_mappable_boundary_reviews_joined_to_addressbase
         )
 
         first_letter_data_quality_checks = AddressbaseDataQualityCheckConstruct(
@@ -83,7 +79,7 @@ class CurrentDivisionBoundaryChangesStack(DataBakerStack):
             "FirstLetterAddressbaseDataQualityChecks",
             athena_query_lambda=self.athena_query_lambda,
             source_table_name=addressbase_cleaned_raw.table_name,
-            target_table_name=current_boundary_reviews_joined_to_addressbase.table_name,
+            target_table_name=current_mappable_boundary_reviews_joined_to_addressbase.table_name,
         )
 
         main_tasks = (
@@ -91,11 +87,13 @@ class CurrentDivisionBoundaryChangesStack(DataBakerStack):
                 make_addresses_to_division_boundary_change_partitions
             )
             .next(
-                delete_old_current_boundary_reviews_joined_to_addressbase_task
+                delete_old_current_mappable_boundary_reviews_joined_to_addressbase_task
             )
-            .next(make_current_boundary_reviews_joined_to_addressbase_task)
             .next(
-                make_current_boundary_reviews_joined_to_addressbase_partitions
+                make_current_mappable_boundary_reviews_joined_to_addressbase_task
+            )
+            .next(
+                make_current_mappable_boundary_reviews_joined_to_addressbase_partitions
             )
             .next(first_letter_data_quality_checks.entry_point)
         )
@@ -122,7 +120,7 @@ class CurrentDivisionBoundaryChangesStack(DataBakerStack):
     def glue_tables() -> List[GlueTable]:
         return [
             addresses_to_division_boundary_change,
-            current_boundary_reviews_joined_to_addressbase,
+            current_mappable_boundary_reviews_joined_to_addressbase,
         ]
 
     def make_partitions_task(self, table) -> tasks.LambdaInvoke:
@@ -237,34 +235,34 @@ class CurrentDivisionBoundaryChangesStack(DataBakerStack):
             .next(map_state)
         )
 
-    def make_delete_old_current_boundary_reviews_joined_to_addressbase_task(
+    def make_delete_old_current_mappable_boundary_reviews_joined_to_addressbase_task(
         self,
     ) -> tasks.LambdaInvoke:
         return tasks.LambdaInvoke(
             self,
-            "Remove old current_boundary_reviews_joined_to_addressbase data from S3",
+            "Remove old current_mappable_boundary_reviews_joined_to_ab data from S3",
             lambda_function=self.empty_bucket_by_prefix_lambda,
             payload=sfn.TaskInput.from_object(
                 {
-                    "bucket": current_boundary_reviews_joined_to_addressbase.bucket.bucket_name,
-                    "prefix": current_boundary_reviews_joined_to_addressbase.s3_prefix.format(
+                    "bucket": current_mappable_boundary_reviews_joined_to_addressbase.bucket.bucket_name,
+                    "prefix": current_mappable_boundary_reviews_joined_to_addressbase.s3_prefix.format(
                         **self.context
                     ),
                 }
             ),
         )
 
-    def make_current_boundary_reviews_joined_to_addressbase_task(
+    def make_current_mappable_boundary_reviews_joined_to_addressbase_task(
         self,
     ) -> tasks.LambdaInvoke:
         return tasks.LambdaInvoke(
             self,
-            "Create current_boundary_reviews_joined_to_addressbase",
+            "Create current_mappable_boundary_reviews_joined_to_addressbase",
             lambda_function=self.athena_query_lambda,
             payload=sfn.TaskInput.from_object(
                 {
-                    "context": current_boundary_reviews_joined_to_addressbase.populated_with.context.copy(),
-                    "QueryName": current_boundary_reviews_joined_to_addressbase.populated_with.name,
+                    "context": current_mappable_boundary_reviews_joined_to_addressbase.populated_with.context.copy(),
+                    "QueryName": current_mappable_boundary_reviews_joined_to_addressbase.populated_with.name,
                     "blocking": True,
                 }
             ),

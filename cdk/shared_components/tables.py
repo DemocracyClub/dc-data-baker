@@ -94,7 +94,7 @@ current_ballots_joined_to_address_base = GlueTable(
 current_division_boundary_changes = GlueTable(
     table_name="current_division_boundary_changes",
     description="A list of boundary changes with a WKT",
-    s3_prefix="{dc_environment}/current_boundary_reviews_with_wkt",
+    s3_prefix="{dc_environment}/current_mappable_boundary_reviews_with_wkt",
     bucket=data_baker_results_bucket,
     database=dc_data_baker,
     data_format=glue.DataFormat.CSV,
@@ -166,10 +166,10 @@ addresses_to_division_boundary_change = GlueTable(
 )
 
 
-current_boundary_reviews_joined_to_addressbase = GlueTable(
-    table_name="current_boundary_reviews_joined_to_addressbase",
+current_mappable_boundary_reviews_joined_to_addressbase = GlueTable(
+    table_name="current_mappable_boundary_reviews_joined_to_addressbase",
     description="A list of current boundary changes per UPRN",
-    s3_prefix="addressbase/{dc_environment}/current_boundary_reviews_joined_to_addressbase/",
+    s3_prefix="addressbase/{dc_environment}/current_mappable_boundary_reviews_joined_to_addressbase/",
     bucket=pollingstations_private_data,
     database=dc_data_baker,
     data_format=glue.DataFormat.PARQUET,
@@ -189,7 +189,7 @@ current_boundary_reviews_joined_to_addressbase = GlueTable(
         )
     ],
     populated_with=BaseQuery(
-        name="current-boundary-reviews-to-addressbase.sql",
+        name="current-mappable-boundary-reviews-to-addressbase.sql",
         context={},
     ),
 )
