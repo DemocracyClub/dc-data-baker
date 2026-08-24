@@ -27,7 +27,10 @@ from shared_components.constructs.singleton_state_machine_construct import (
     SingletonStateMachineConstruct,
 )
 from shared_components.models import GlueTable, S3Bucket
-from shared_components.tables import current_division_boundary_changes
+from shared_components.tables import (
+    current_division_boundary_changes,
+    current_pre_division_boundary_reviews,
+)
 from stacks.base_stack import DataBakerStack
 
 
@@ -52,9 +55,23 @@ class CurrentBoundaryChangesCoordinatorStack(DataBakerStack):
             "MakeCurrentDivisionBoundaryChangesParquetArn"
         )
 
-        delete_old_current_division_boundary_changes_task = (
-            self.make_delete_old_current_division_boundary_changes_task()
+        current_pre_division_boundary_reviews_state_machine_arn = (
+            Fn.import_value("MakeCurrentPreDivisionBoundaryReviewsParquetArn")
         )
+
+        boundary_changes_state_machines = [
+            (
+                current_division_boundary_changes_state_machine_arn,
+                "CurrentDivisionBoundaryChanges",
+            ),
+            (
+                current_pre_division_boundary_reviews_state_machine_arn,
+                "CurrentPreDivisionBoundaryReviews",
+            ),
+        ]
+
+        delete_old_csvs_in_parallel = self.make_delete_old_csvs_in_parallel()
+
         create_current_division_boundary_changes_csv_task = (
             self.make_current_division_boundary_changes_csv_task()
         )
@@ -67,29 +84,33 @@ class CurrentBoundaryChangesCoordinatorStack(DataBakerStack):
             self.make_current_division_boundary_changes_csv_quality_check()
         )
 
+        create_current_pre_division_boundary_reviews_csv_task = (
+            self.make_current_pre_division_boundary_reviews_csv_task()
+        )
+
+        make_current_pre_division_boundary_reviews_partitions_task = (
+            self.make_partitions_task(current_pre_division_boundary_reviews)
+        )
+
         run_state_machines_in_parallel = sfn.Parallel(
             self,
             "Run state machines in parallel",
             comment="Run the precursor state machines in parallel to create ",
         )
-
-        run_current_division_boundary_changes_state_machine_branch = (
-            self.make_run_state_machine_branch_from_arn(
-                current_division_boundary_changes_state_machine_arn,
-                "CurrentDivisionBoundaryChangesStateMachine",
+        for sm_arn, sm_id in boundary_changes_state_machines:
+            run_state_machine_branch = (
+                self.make_run_state_machine_branch_from_arn(sm_arn, sm_id)
             )
-        )
-
-        run_state_machines_in_parallel.branch(
-            run_current_division_boundary_changes_state_machine_branch
-        )
+            run_state_machines_in_parallel.branch(run_state_machine_branch)
 
         main_tasks = (
-            delete_old_current_division_boundary_changes_task.next(
+            delete_old_csvs_in_parallel.next(
                 create_current_division_boundary_changes_csv_task
             )
             .next(make_current_division_boundary_changes_partitions)
             .next(current_division_boundary_changes_csv_quality_check)
+            .next(create_current_pre_division_boundary_reviews_csv_task)
+            .next(make_current_pre_division_boundary_reviews_partitions_task)
             .next(run_state_machines_in_parallel)
         )
 
@@ -113,7 +134,10 @@ class CurrentBoundaryChangesCoordinatorStack(DataBakerStack):
 
     @staticmethod
     def glue_tables() -> List[GlueTable]:
-        return [current_division_boundary_changes]
+        return [
+            current_division_boundary_changes,
+            current_pre_division_boundary_reviews,
+        ]
 
     def make_partitions_task(self, table) -> tasks.LambdaInvoke:
         return MakePartitionsConstruct(
@@ -148,19 +172,32 @@ class CurrentBoundaryChangesCoordinatorStack(DataBakerStack):
             integration_pattern=sfn.IntegrationPattern.RUN_JOB,
         )
 
-    def make_delete_old_current_division_boundary_changes_task(
-        self,
-    ) -> tasks.LambdaInvoke:
+    def make_delete_old_csvs_in_parallel(self) -> sfn.Parallel:
+        delete_old_csvs_in_parallel = sfn.Parallel(
+            self,
+            "Delete old CSVs in parallel",
+            comment="Delete old CSVs in parallel",
+        )
+
+        old_csvs = [
+            current_division_boundary_changes,
+            current_pre_division_boundary_reviews,
+        ]
+        for table in old_csvs:
+            delete_old_csv_task = self.make_delete_old_csv_task(table)
+            delete_old_csvs_in_parallel.branch(delete_old_csv_task)
+
+        return delete_old_csvs_in_parallel
+
+    def make_delete_old_csv_task(self, table: GlueTable) -> tasks.LambdaInvoke:
         return tasks.LambdaInvoke(
             self,
-            "Remove old data from S3",
+            f"Remove old data for {table.table_name} from S3",
             lambda_function=self.empty_bucket_by_prefix_lambda,
             payload=sfn.TaskInput.from_object(
                 {
-                    "bucket": current_division_boundary_changes.bucket.bucket_name,
-                    "prefix": current_division_boundary_changes.s3_prefix.format(
-                        **self.context
-                    ),
+                    "bucket": table.bucket.bucket_name,
+                    "prefix": table.s3_prefix.format(**self.context),
                 }
             ),
         )
@@ -267,4 +304,43 @@ class CurrentBoundaryChangesCoordinatorStack(DataBakerStack):
             .next(remove_headers)
             .next(count_results)
             .next(check_results_count.afterwards())
+        )
+
+    def make_current_pre_division_boundary_reviews_csv_task(
+        self,
+    ) -> tasks.LambdaInvoke:
+        create_current_pre_division_boundary_reviews_csv_function = aws_lambda_python.PythonFunction(
+            self,
+            "create_current_pre_division_boundary_reviews_csv",
+            function_name="create_current_pre_division_boundary_reviews_csv",
+            runtime=aws_lambda.Runtime.PYTHON_3_12,
+            handler="handler",
+            entry="cdk/shared_components/lambdas/create_pre_division_boundary_reviews_csv",
+            index="create_current_pre_division_boundary_reviews_csv.py",
+            timeout=Duration.seconds(900),
+            memory_size=2048,
+        )
+
+        create_current_pre_division_boundary_reviews_csv_function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "ssm:*",
+                    "s3:*",
+                ],
+                resources=["*"],
+            )
+        )
+
+        return tasks.LambdaInvoke(
+            self,
+            "Make current pre-division boundary reviews CSV",
+            lambda_function=create_current_pre_division_boundary_reviews_csv_function,
+            payload=sfn.TaskInput.from_object(
+                {
+                    "s3_bucket": current_pre_division_boundary_reviews.bucket.bucket_name,
+                    "s3_prefix": current_pre_division_boundary_reviews.s3_prefix.format(
+                        **self.context
+                    ),
+                }
+            ),
         )

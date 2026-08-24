@@ -11,6 +11,9 @@ from stacks.current_division_boundary_changes import (
     CurrentDivisionBoundaryChangesStack,
 )
 from stacks.current_elections import CurrentElectionsStack
+from stacks.current_pre_division_boundary_reviews import (
+    CurrentPreDivisionBoundaryReviewsStack,
+)
 from stacks.data_baker_core import DataBakerCoreStack
 
 valid_environments = (
@@ -62,6 +65,12 @@ CurrentDivisionBoundaryChangesStack(
 CurrentBoundaryChangesCoordinatorStack(
     app,
     "CurrentBoundaryChangesCoordinatorStack",
+    env=env,
+)
+
+CurrentPreDivisionBoundaryReviewsStack(
+    app,
+    "CurrentPreDivisionBoundaryReviewsStack",
     env=env,
 )
 
