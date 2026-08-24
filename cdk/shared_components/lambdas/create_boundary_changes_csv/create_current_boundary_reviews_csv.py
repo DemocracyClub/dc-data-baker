@@ -55,7 +55,7 @@ def export_sql():
                 JOIN organisations_organisation o ON o.id = obr.organisation_id
                 JOIN organisations_organisationgeography og ON og.organisation_id = o.id
             WHERE
-                obr.public_visibility != 'HIDDEN'
+                obr.public_visibility = 'MAP'
                 AND NOT EXISTS (
                     SELECT
                         e.election_id
