@@ -1,3 +1,9 @@
+"""
+This stack builds the intermediate division boundary change parquet files
+by creating division-type-to-boundary-review mappings
+and joining them to addressbase data.
+"""
+
 from typing import List
 
 from aws_cdk import (

@@ -1,3 +1,8 @@
+"""
+This stack builds the intermediate pre-division boundary reviews parquet files
+by joining the reviews to addressbase data.
+"""
+
 from typing import List
 
 from aws_cdk import (
