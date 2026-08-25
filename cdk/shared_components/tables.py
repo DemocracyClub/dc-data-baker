@@ -100,7 +100,8 @@ current_division_boundary_changes = GlueTable(
     data_format=glue.DataFormat.CSV,
     columns={
         "slug": glue.Schema.STRING,
-        "status": glue.Schema.STRING,
+        "scraped_status": glue.Schema.STRING,
+        "dc_stage": glue.Schema.STRING,
         "latest_event": glue.Schema.STRING,
         "consultation_url": glue.Schema.STRING,
         "legislation_title": glue.Schema.STRING,
@@ -232,7 +233,8 @@ current_pre_division_boundary_reviews = GlueTable(
     data_format=glue.DataFormat.CSV,
     columns={
         "slug": glue.Schema.STRING,
-        "status": glue.Schema.STRING,
+        "scraped_status": glue.Schema.STRING,
+        "dc_stage": glue.Schema.STRING,
         "latest_event": glue.Schema.STRING,
         "consultation_url": glue.Schema.STRING,
         "legislation_title": glue.Schema.STRING,

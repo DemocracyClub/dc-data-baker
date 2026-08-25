@@ -26,7 +26,8 @@ def export_sql():
             SELECT
                 obr.id AS boundary_review_id,
                 obr.slug,
-                obr.status,
+                obr.status AS scraped_status,
+                obr.public_visibility AS dc_stage,
                 obr.latest_event,
                 obr.consultation_url,
                 obr.legislation_title,
@@ -62,7 +63,8 @@ def export_sql():
         )
     SELECT
         r.slug,
-        r.status,
+        r.scraped_status,
+        r.dc_stage,
         r.latest_event,
         r.consultation_url,
         r.legislation_title,

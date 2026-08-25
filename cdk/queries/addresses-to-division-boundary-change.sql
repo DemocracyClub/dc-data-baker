@@ -11,6 +11,7 @@ UNLOAD (
                 division_boundary_wkt,
                 divisionset_pmtiles_url,
                 divisionset_generation,
+                dc_stage,
                 consultation_url,
                 legislation_title,
                 effective_date,
@@ -35,6 +36,7 @@ UNLOAD (
                 a.postcode,
                 a.addressbase_source,
                 od.boundary_review_id,
+                od.dc_stage,
                 od.divisionset_pmtiles_url AS old_divisionset_pmtiles_url,
                 nd.divisionset_pmtiles_url AS new_divisionset_pmtiles_url,
                 od.division_type,
@@ -98,6 +100,7 @@ UNLOAD (
                 a.addressbase_source,
                 a.division_type,
         		a.boundary_review_id,
+                a.dc_stage,
                 a.old_divisionset_pmtiles_url AS old_divisionset_pmtiles_url,
                 a.new_divisionset_pmtiles_url AS new_divisionset_pmtiles_url,
         		a.old_division_slug AS old_division_slug,
@@ -152,8 +155,9 @@ UNLOAD (
             ]
         ) AS boundary_change_details,
         MAP(
-            ARRAY['consultation_url', 'legislation_title', 'effective_date', 'organisation_name', 'organisation_official_name', 'organisation_gss'],
+            ARRAY['dc_stage', 'consultation_url', 'legislation_title', 'effective_date', 'organisation_name', 'organisation_official_name', 'organisation_gss'],
             ARRAY[
+                dc_stage,
                 consultation_url,
                 legislation_title,
                 effective_date,

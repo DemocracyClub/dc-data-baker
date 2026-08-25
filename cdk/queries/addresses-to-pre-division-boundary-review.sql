@@ -2,9 +2,7 @@ UNLOAD (
     WITH
         review AS (
             SELECT
-                slug,
-                status,
-                latest_event,
+                dc_stage,
                 consultation_url,
                 legislation_title,
                 effective_date,
@@ -24,6 +22,7 @@ UNLOAD (
                 a.postcode,
                 a.addressbase_source,
                 r.boundary_review_id,
+                r.dc_stage,
                 r.consultation_url,
                 r.legislation_title,
                 r.effective_date,
@@ -43,8 +42,9 @@ UNLOAD (
         addressbase_source,
         boundary_review_id,
         MAP(
-            ARRAY['consultation_url', 'legislation_title', 'effective_date', 'organisation_name', 'organisation_official_name', 'organisation_gss'],
+            ARRAY['dc_stage', 'consultation_url', 'legislation_title', 'effective_date', 'organisation_name', 'organisation_official_name', 'organisation_gss'],
             ARRAY[
+                dc_stage,
                 consultation_url,
                 legislation_title,
                 effective_date,
