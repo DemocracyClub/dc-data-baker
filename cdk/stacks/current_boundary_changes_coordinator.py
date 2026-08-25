@@ -19,6 +19,16 @@ from aws_cdk import aws_stepfunctions_tasks as tasks
 from constructs import Construct
 from shared_components.buckets import (
     data_baker_results_bucket,
+    pollingstations_private_data,
+)
+from shared_components.constructs.addressbase_data_quality_check_construct import (
+    AddressbaseDataQualityCheckConstruct,
+)
+from shared_components.constructs.addressbase_source_check_construct import (
+    AddressBaseSourceCheckConstruct,
+)
+from shared_components.constructs.delete_stale_outcodes_construct import (
+    DeleteStaleOutcodesConstruct,
 )
 from shared_components.constructs.make_partitions_construct import (
     MakePartitionsConstruct,
@@ -28,6 +38,9 @@ from shared_components.constructs.singleton_state_machine_construct import (
 )
 from shared_components.models import GlueTable, S3Bucket
 from shared_components.tables import (
+    addressbase_cleaned_raw,
+    current_boundary_reviews_joined_to_addressbase,
+    current_boundary_reviews_parquet,
     current_division_boundary_changes,
     current_pre_division_boundary_reviews,
 )
@@ -49,6 +62,18 @@ class CurrentBoundaryChangesCoordinatorStack(DataBakerStack):
         self.empty_bucket_by_prefix_lambda = (
             aws_lambda.Function.from_function_arn(
                 self, "EmptyS3BucketByPrefix", self.empty_bucket_by_prefix
+            )
+        )
+
+        self.first_letter_to_outcode_parquet_lambda_arn = Fn.import_value(
+            "FirstLetterToOutcodeParquetLambdaArnOutput"
+        )
+
+        self.first_letter_to_outcode_parquet_lambda = (
+            aws_lambda.Function.from_function_arn(
+                self,
+                "FirstLetterToOutcodeParquet",
+                self.first_letter_to_outcode_parquet_lambda_arn,
             )
         )
         current_division_boundary_changes_state_machine_arn = Fn.import_value(
@@ -103,6 +128,45 @@ class CurrentBoundaryChangesCoordinatorStack(DataBakerStack):
             )
             run_state_machines_in_parallel.branch(run_state_machine_branch)
 
+        delete_old_current_boundary_reviews_joined_to_addressbase_task = self.make_delete_old_current_boundary_reviews_joined_to_addressbase_task()
+        make_current_boundary_reviews_joined_to_addressbase_task = (
+            self.make_current_boundary_reviews_joined_to_addressbase_task()
+        )
+
+        make_current_current_boundary_reviews_joined_to_addressbase_partitions_task = self.make_partitions_task(
+            current_boundary_reviews_joined_to_addressbase
+        )
+
+        first_letter_data_quality_checks = AddressbaseDataQualityCheckConstruct(
+            self,
+            "FirstLetterAddressbaseDataQualityChecks",
+            athena_query_lambda=self.athena_query_lambda,
+            source_table_name=addressbase_cleaned_raw.table_name,
+            target_table_name=current_boundary_reviews_joined_to_addressbase.table_name,
+        )
+
+        delete_stale_outcodes = DeleteStaleOutcodesConstruct(
+            self,
+            "DeleteStaleOutcodes",
+            athena_query_lambda=self.athena_query_lambda,
+            delete_objects_lambda=self.empty_bucket_by_prefix_lambda,
+            source_table_name=current_boundary_reviews_joined_to_addressbase.table_name,
+            target_table_name=current_boundary_reviews_parquet.table_name,
+            dest_bucket_name=current_boundary_reviews_parquet.bucket.bucket_name,
+            dest_path=current_boundary_reviews_parquet.s3_prefix.format(
+                dc_environment=self.dc_environment
+            ),
+        )
+
+        outcode_addressbase_source_check = AddressBaseSourceCheckConstruct(
+            self,
+            "OutcodeAddressbaseSourceCheck",
+            athena_query_lambda=self.athena_query_lambda,
+            table_name=current_boundary_reviews_parquet.table_name,
+        )
+
+        parallel_outcodes_task = self.make_parallel_outcodes_task()
+
         main_tasks = (
             delete_old_csvs_in_parallel.next(
                 create_current_division_boundary_changes_csv_task
@@ -112,6 +176,17 @@ class CurrentBoundaryChangesCoordinatorStack(DataBakerStack):
             .next(create_current_pre_division_boundary_reviews_csv_task)
             .next(make_current_pre_division_boundary_reviews_partitions_task)
             .next(run_state_machines_in_parallel)
+            .next(
+                delete_old_current_boundary_reviews_joined_to_addressbase_task
+            )
+            .next(make_current_boundary_reviews_joined_to_addressbase_task)
+            .next(
+                make_current_current_boundary_reviews_joined_to_addressbase_partitions_task
+            )
+            .next(first_letter_data_quality_checks.entry_point)
+            .next(parallel_outcodes_task)
+            .next(delete_stale_outcodes.entry_point)
+            .next(outcode_addressbase_source_check.entry_point)
         )
 
         self.step_function = SingletonStateMachineConstruct(
@@ -130,13 +205,18 @@ class CurrentBoundaryChangesCoordinatorStack(DataBakerStack):
 
     @staticmethod
     def s3_buckets() -> List[S3Bucket]:
-        return [data_baker_results_bucket]
+        return [
+            data_baker_results_bucket,
+            pollingstations_private_data,
+        ]
 
     @staticmethod
     def glue_tables() -> List[GlueTable]:
         return [
             current_division_boundary_changes,
             current_pre_division_boundary_reviews,
+            current_boundary_reviews_joined_to_addressbase,
+            current_boundary_reviews_parquet,
         ]
 
     def make_partitions_task(self, table) -> tasks.LambdaInvoke:
@@ -344,3 +424,68 @@ class CurrentBoundaryChangesCoordinatorStack(DataBakerStack):
                 }
             ),
         )
+
+    def make_delete_old_current_boundary_reviews_joined_to_addressbase_task(
+        self,
+    ) -> tasks.LambdaInvoke:
+        return tasks.LambdaInvoke(
+            self,
+            "Remove old current_boundary_reviews_joined_to_ab data from S3",
+            lambda_function=self.empty_bucket_by_prefix_lambda,
+            payload=sfn.TaskInput.from_object(
+                {
+                    "bucket": current_boundary_reviews_joined_to_addressbase.bucket.bucket_name,
+                    "prefix": current_boundary_reviews_joined_to_addressbase.s3_prefix.format(
+                        **self.context
+                    ),
+                }
+            ),
+        )
+
+    def make_current_boundary_reviews_joined_to_addressbase_task(
+        self,
+    ) -> tasks.LambdaInvoke:
+        return tasks.LambdaInvoke(
+            self,
+            "Create current_boundary_reviews_joined_to_addressbase",
+            lambda_function=self.athena_query_lambda,
+            payload=sfn.TaskInput.from_object(
+                {
+                    "context": current_boundary_reviews_joined_to_addressbase.populated_with.context.copy(),
+                    "QueryName": current_boundary_reviews_joined_to_addressbase.populated_with.name,
+                    "blocking": True,
+                }
+            ),
+        )
+
+    def make_parallel_outcodes_task(self) -> sfn.Parallel:
+        parallel_outcodes = sfn.Parallel(
+            self, "Make outcode parquet per first letter"
+        )
+        alphabet = [chr(i) for i in range(ord("A"), ord("Z") + 1)]
+        for letter in alphabet:
+            context = current_boundary_reviews_joined_to_addressbase.populated_with.context.copy()
+            context["first_letter"] = letter
+
+            parallel_outcodes.branch(
+                tasks.LambdaInvoke(
+                    self,
+                    f"Make outcode parquet for {letter}",
+                    lambda_function=self.first_letter_to_outcode_parquet_lambda,
+                    payload=sfn.TaskInput.from_object(
+                        {
+                            "first_letter": letter,
+                            "source_bucket_name": current_boundary_reviews_joined_to_addressbase.bucket.bucket_name,
+                            "source_path": current_boundary_reviews_joined_to_addressbase.s3_prefix.format(
+                                dc_environment=self.dc_environment
+                            ),
+                            "dest_bucket_name": current_boundary_reviews_parquet.bucket.bucket_name,
+                            "dest_path": current_boundary_reviews_parquet.s3_prefix.format(
+                                dc_environment=self.dc_environment
+                            ),
+                            "filter_column": "boundary_reviews",
+                        }
+                    ),
+                )
+            )
+        return parallel_outcodes
