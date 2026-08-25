@@ -7,6 +7,12 @@ from stacks.addressbase import AddressBaseStack
 from stacks.current_boundary_changes_coordinator import (
     CurrentBoundaryChangesCoordinatorStack,
 )
+from stacks.current_boundary_changes_merge import (
+    CurrentBoundaryChangesMergeStack,
+)
+from stacks.current_boundary_changes_precursor_csvs import (
+    CurrentBoundaryChangesPrecursorCSVsStack,
+)
 from stacks.current_division_boundary_changes import (
     CurrentDivisionBoundaryChangesStack,
 )
@@ -56,21 +62,33 @@ CurrentElectionsStack(
     env=env,
 )
 
-CurrentDivisionBoundaryChangesStack(
-    app,
-    "CurrentDivisionBoundaryChangesStack",
-    env=env,
-)
-
 CurrentBoundaryChangesCoordinatorStack(
     app,
     "CurrentBoundaryChangesCoordinatorStack",
     env=env,
 )
 
+CurrentBoundaryChangesPrecursorCSVsStack(
+    app,
+    "CurrentBoundaryChangesPrecursorCSVsStack",
+    env=env,
+)
+
+CurrentDivisionBoundaryChangesStack(
+    app,
+    "CurrentDivisionBoundaryChangesStack",
+    env=env,
+)
+
 CurrentPreDivisionBoundaryReviewsStack(
     app,
     "CurrentPreDivisionBoundaryReviewsStack",
+    env=env,
+)
+
+CurrentBoundaryChangesMergeStack(
+    app,
+    "CurrentBoundaryChangesMergeStack",
     env=env,
 )
 
