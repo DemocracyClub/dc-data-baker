@@ -45,13 +45,26 @@ class SingletonStateMachineConstruct(Construct):
             )
         )
 
-        should_run_decision = self.make_should_run_decision(main_tasks)
+        normalize_input = sfn.Pass(
+            self,
+            "NormalizeStateMachineInput",
+            parameters={"OriginalInput.$": "$"},
+        )
+        restore_original_input = sfn.Pass(
+            self,
+            "RestoreOriginalInput",
+            output_path="$.OriginalInput",
+        )
+
+        should_run_decision = self.make_should_run_decision(
+            restore_original_input.next(main_tasks)
+        )
 
         check_step_function_running_task = (
             self.make_check_step_function_running_task()
         )
-        state_definition = check_step_function_running_task.next(
-            should_run_decision
+        state_definition = normalize_input.next(
+            check_step_function_running_task.next(should_run_decision)
         )
 
         step_function = sfn.StateMachine(
@@ -75,7 +88,11 @@ class SingletonStateMachineConstruct(Construct):
                     "currentExecutionArn.$": "$$.Execution.Id",
                 }
             ),
-            output_path="$.Payload",
+            result_path="$.CheckConcurrentExecutionPayload",
+            result_selector={
+                "proceed": sfn.JsonPath.string_at("$.Payload.proceed"),
+                "message": sfn.JsonPath.string_at("$.Payload.message"),
+            },
         )
 
     def make_should_run_decision(self, main_tasks) -> sfn.Choice:
@@ -87,7 +104,10 @@ class SingletonStateMachineConstruct(Construct):
         )
         decision = sfn.Choice(self, "CanProceed?")
         decision.when(
-            sfn.Condition.boolean_equals("$.proceed", True), main_tasks
+            sfn.Condition.boolean_equals(
+                "$.CheckConcurrentExecutionPayload.proceed", True
+            ),
+            main_tasks,
         )
         decision.otherwise(fail_state)
         return decision
