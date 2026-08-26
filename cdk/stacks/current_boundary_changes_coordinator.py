@@ -9,14 +9,20 @@ their corresponding boundary changes per UK address (UPRN).
 from typing import List
 
 from aws_cdk import (
-    # CfnOutput,
+    CfnOutput,
     Fn,
+    aws_events,
+    aws_events_targets,
+    aws_sqs,
 )
 from aws_cdk import aws_stepfunctions as sfn
 from aws_cdk import aws_stepfunctions_tasks as tasks
 from constructs import Construct
 from shared_components.constructs.singleton_state_machine_construct import (
     SingletonStateMachineConstruct,
+)
+from shared_components.constructs.step_function_event_queue_construct import (
+    StepFunctionEventQueueConstruct,
 )
 from shared_components.models import GlueTable, S3Bucket
 from stacks.base_stack import DataBakerStack
@@ -88,12 +94,14 @@ class CurrentBoundaryChangesCoordinatorStack(DataBakerStack):
             main_tasks=main_tasks,
         ).entry_point
 
-        # CfnOutput(
-        #     self,
-        #     "MakeCurrentBoundaryChangesParquetArnOutput",
-        #     value=self.step_function.state_machine_arn,
-        #     export_name="MakeCurrentBoundaryChangesParquetArn",
-        # )
+        self.make_event_triggers()
+
+        CfnOutput(
+            self,
+            "MakeCurrentBoundaryChangesParquetArnOutput",
+            value=self.step_function.state_machine_arn,
+            export_name="MakeCurrentBoundaryChangesParquetArn",
+        )
 
     @staticmethod
     def s3_buckets() -> List[S3Bucket]:
@@ -126,4 +134,48 @@ class CurrentBoundaryChangesCoordinatorStack(DataBakerStack):
             f"Run{state_machine_id}",
             state_machine=state_machine,
             integration_pattern=sfn.IntegrationPattern.RUN_JOB,
+        )
+
+    def make_event_triggers(self):
+        event_queue = StepFunctionEventQueueConstruct(
+            self,
+            "MakeCurrentBoundaryChangesEventQueue",
+            target_step_function=self.step_function,
+            queue_name="CurrentBoundaryChangesEventQueue",
+            pipe_name="RunCurrentBoundaryChangesBuilder",
+        ).entry_point
+        self.make_run_nightly_rule(event_queue)
+        self.make_rebuild_boundary_changes_parquet_rule(event_queue)
+
+    def make_run_nightly_rule(self, event_queue: aws_sqs.IQueue):
+        one_am = aws_events.Schedule.cron(minute="0", hour="1")
+        run_nightly_rule = aws_events.Rule(
+            self, "RebuildCurrentBoundaryChangesNightlyTrigger", schedule=one_am
+        )
+        run_nightly_rule.add_target(
+            aws_events_targets.SqsQueue(
+                event_queue,
+                message=aws_events.RuleTargetInput.from_text("Nightly re-run"),
+                message_group_id="boundary_change_set_changed",
+            )
+        )
+
+    def make_rebuild_boundary_changes_parquet_rule(
+        self, event_queue: aws_sqs.IQueue
+    ):
+        aws_events.Rule(
+            self,
+            "RebuildCurrentBoundaryChangesTrigger",
+            targets=[
+                aws_events_targets.SqsQueue(
+                    event_queue,
+                    message_group_id="boundary_change_set_changed",
+                ),
+            ],
+            event_pattern=aws_events.EventPattern(
+                detail_type=[
+                    "boundary_change_set_changed",
+                    "elections_set_changed",  # Not all election set changes are relevant to boundary changes, but its easier to include all than filter
+                ]
+            ),
         )
