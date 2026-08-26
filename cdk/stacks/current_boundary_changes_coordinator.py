@@ -134,6 +134,7 @@ class CurrentBoundaryChangesCoordinatorStack(DataBakerStack):
             f"Run{state_machine_id}",
             state_machine=state_machine,
             integration_pattern=sfn.IntegrationPattern.RUN_JOB,
+            input=sfn.TaskInput.from_object({"coordinated_stack": True}),
         )
 
     def make_event_triggers(self):

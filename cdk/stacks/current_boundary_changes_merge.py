@@ -24,14 +24,14 @@ from shared_components.constructs.addressbase_data_quality_check_construct impor
 from shared_components.constructs.addressbase_source_check_construct import (
     AddressBaseSourceCheckConstruct,
 )
+from shared_components.constructs.coordinated_singleton_state_machine_construct import (
+    CoordinatedSingletonStateMachineConstruct,
+)
 from shared_components.constructs.delete_stale_outcodes_construct import (
     DeleteStaleOutcodesConstruct,
 )
 from shared_components.constructs.make_partitions_construct import (
     MakePartitionsConstruct,
-)
-from shared_components.constructs.singleton_state_machine_construct import (
-    SingletonStateMachineConstruct,
 )
 from shared_components.models import GlueTable, S3Bucket
 from shared_components.tables import (
@@ -124,7 +124,7 @@ class CurrentBoundaryChangesMergeStack(DataBakerStack):
             .next(outcode_addressbase_source_check.entry_point)
         )
 
-        self.step_function = SingletonStateMachineConstruct(
+        self.step_function = CoordinatedSingletonStateMachineConstruct(
             self,
             "MakeCurrentBoundaryChangesMergeStack",
             step_function_name="CurrentBoundaryChangesMergeStack",

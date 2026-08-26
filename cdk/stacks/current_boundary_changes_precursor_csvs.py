@@ -21,11 +21,11 @@ from constructs import Construct
 from shared_components.buckets import (
     data_baker_results_bucket,
 )
+from shared_components.constructs.coordinated_singleton_state_machine_construct import (
+    CoordinatedSingletonStateMachineConstruct,
+)
 from shared_components.constructs.make_partitions_construct import (
     MakePartitionsConstruct,
-)
-from shared_components.constructs.singleton_state_machine_construct import (
-    SingletonStateMachineConstruct,
 )
 from shared_components.models import GlueTable, S3Bucket
 from shared_components.tables import (
@@ -85,7 +85,7 @@ class CurrentBoundaryChangesPrecursorCSVsStack(DataBakerStack):
             .next(make_current_pre_division_boundary_reviews_partitions_task)
         )
 
-        self.step_function = SingletonStateMachineConstruct(
+        self.step_function = CoordinatedSingletonStateMachineConstruct(
             self,
             "MakeCurrentBoundaryChangesPrecursorCSVsStack",
             step_function_name="CurrentBoundaryChangesPrecursorCSVsStack",

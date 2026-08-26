@@ -20,11 +20,11 @@ from shared_components.buckets import (
 from shared_components.constructs.addressbase_data_quality_check_construct import (
     AddressbaseDataQualityCheckConstruct,
 )
+from shared_components.constructs.coordinated_singleton_state_machine_construct import (
+    CoordinatedSingletonStateMachineConstruct,
+)
 from shared_components.constructs.make_partitions_construct import (
     MakePartitionsConstruct,
-)
-from shared_components.constructs.singleton_state_machine_construct import (
-    SingletonStateMachineConstruct,
 )
 from shared_components.models import GlueTable, S3Bucket
 from shared_components.tables import (
@@ -97,7 +97,7 @@ class CurrentPreDivisionBoundaryReviewsStack(DataBakerStack):
             .next(first_letter_data_quality_checks.entry_point)
         )
 
-        self.step_function = SingletonStateMachineConstruct(
+        self.step_function = CoordinatedSingletonStateMachineConstruct(
             self,
             "MakeCurrentPreDivisionBoundaryReviewsParquet",
             step_function_name="MakeCurrentPreDivisionBoundaryReviewsParquet",
