@@ -25,7 +25,8 @@ UNLOAD (
 			uprn,
             array_agg(
                    '{{"boundary_review_id":' || json_format(CAST(boundary_review_id AS JSON)) ||
-                   ',"boundary_review_details":' || json_format(CAST(boundary_review_details AS JSON)) || '}}'
+                   ',"boundary_review_details":' || json_format(CAST(boundary_review_details AS JSON)) ||
+                   ',"changes": ' || json_format(CAST(ARRAY[] AS JSON)) || '}}'
                     ORDER BY boundary_review_id
             ) AS boundary_reviews
 		FROM grouped_by_review
