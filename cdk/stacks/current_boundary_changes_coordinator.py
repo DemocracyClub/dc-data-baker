@@ -39,6 +39,7 @@ class CurrentBoundaryChangesCoordinatorStack(DataBakerStack):
             self.make_run_state_machine_task_from_arn(
                 current_boundary_changes_precursor_csvs_state_machine_arn,
                 "MakeCurrentBoundaryChangesPrecursorCSVs",
+                "Query EE in series to generate the precursor CSVs",
             )
         )
 
@@ -52,21 +53,22 @@ class CurrentBoundaryChangesCoordinatorStack(DataBakerStack):
         current_boundary_changes_merge_state_machine_arn = Fn.import_value(
             "MakeCurrentBoundaryChangesMergeArn"
         )
-        run_merge_state_machine_task = (
-            self.make_run_state_machine_task_from_arn(
-                current_boundary_changes_merge_state_machine_arn,
-                "MakeCurrentBoundaryChangesMerge",
-            )
+        run_merge_state_machine_task = self.make_run_state_machine_task_from_arn(
+            current_boundary_changes_merge_state_machine_arn,
+            "MakeCurrentBoundaryChangesMerge",
+            "Merge intermediate parquet files into final parquet files per outcode",
         )
 
         boundary_changes_ab_join_state_machines = [
             (
                 current_division_boundary_changes_state_machine_arn,
                 "MakeCurrentDivisionBoundaryChanges",
+                "Join Mappable Boundary Reviews to AB",
             ),
             (
                 current_pre_division_boundary_reviews_state_machine_arn,
                 "MakeCurrentPreDivisionBoundaryReviews",
+                "Join pre-division Boundary Reviews to AB",
             ),
         ]
 
@@ -75,9 +77,11 @@ class CurrentBoundaryChangesCoordinatorStack(DataBakerStack):
             "Run addressbase join state machines in parallel",
             comment="Run the addressbase join state machines in parallel to create intermediary parquet files",
         )
-        for sm_arn, sm_id in boundary_changes_ab_join_state_machines:
+        for sm_arn, sm_id, sm_name in boundary_changes_ab_join_state_machines:
             run_state_machine_branch = (
-                self.make_run_state_machine_branch_from_arn(sm_arn, sm_id)
+                self.make_run_state_machine_branch_from_arn(
+                    sm_arn, sm_id, sm_name
+                )
             )
             run_ab_join_state_machines_in_parallel.branch(
                 run_state_machine_branch
@@ -112,10 +116,10 @@ class CurrentBoundaryChangesCoordinatorStack(DataBakerStack):
         return []
 
     def make_run_state_machine_branch_from_arn(
-        self, state_machine_arn: str, state_machine_id: str
+        self, state_machine_arn: str, state_machine_id: str, state_name: str
     ) -> sfn.Chain:
         run_state_machine_task = self.make_run_state_machine_task_from_arn(
-            state_machine_arn, state_machine_id
+            state_machine_arn, state_machine_id, state_name
         )
         return sfn.Chain.start(run_state_machine_task)
 
@@ -123,6 +127,7 @@ class CurrentBoundaryChangesCoordinatorStack(DataBakerStack):
         self,
         state_machine_arn: str,
         state_machine_id: str,
+        state_name: str,
     ) -> tasks.StepFunctionsStartExecution:
         state_machine = sfn.StateMachine.from_state_machine_arn(
             self,
@@ -133,6 +138,7 @@ class CurrentBoundaryChangesCoordinatorStack(DataBakerStack):
             self,
             f"Run{state_machine_id}",
             state_machine=state_machine,
+            state_name=state_name,
             integration_pattern=sfn.IntegrationPattern.RUN_JOB,
             input=sfn.TaskInput.from_object({"coordinated_stack": True}),
         )
