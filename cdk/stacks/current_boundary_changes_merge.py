@@ -89,6 +89,8 @@ class CurrentBoundaryChangesMergeStack(DataBakerStack):
             target_table_name=current_boundary_reviews_joined_to_addressbase.table_name,
         )
 
+        merge_quality_check = self.make_merge_quality_check()
+
         delete_stale_outcodes = DeleteStaleOutcodesConstruct(
             self,
             "DeleteStaleOutcodes",
@@ -119,6 +121,7 @@ class CurrentBoundaryChangesMergeStack(DataBakerStack):
                 make_current_current_boundary_reviews_joined_to_addressbase_partitions_task
             )
             .next(first_letter_data_quality_checks.entry_point)
+            .next(merge_quality_check)
             .next(parallel_outcodes_task)
             .next(delete_stale_outcodes.entry_point)
             .next(outcode_addressbase_source_check.entry_point)
@@ -216,6 +219,59 @@ class CurrentBoundaryChangesMergeStack(DataBakerStack):
                     "blocking": True,
                 }
             ),
+        )
+
+    def make_merge_quality_check(self) -> sfn.Chain:
+        # query for uprns with duplicated reviews
+        merge_quality_check_query = tasks.LambdaInvoke(
+            self,
+            "Query for duplicated reviews",
+            lambda_function=self.athena_query_lambda,
+            payload=sfn.TaskInput.from_object(
+                {
+                    "context": current_boundary_reviews_joined_to_addressbase.populated_with.context.copy(),
+                    "QueryString": """
+                    SELECT
+                        COUNT(*) as uprns_with_duplicate_reviews
+                    FROM current_boundary_reviews_joined_to_addressbase
+                    WHERE cardinality(boundary_reviews)!= cardinality(array_distinct(boundary_reviews))
+                    """,
+                    "blocking": True,
+                }
+            ),
+        )
+        # get the results
+        get_merge_quality_check_results = tasks.AthenaGetQueryResults(
+            self,
+            "Get duplicated reviews query results",
+            query_execution_id="{% $states.input.Payload.queryExecutionId %}",
+            query_language=sfn.QueryLanguage.JSONATA,
+        )
+        # drop the header row
+        remove_headers = sfn.Pass(
+            self,
+            "Drop header from duplicated reviews query results",
+            parameters={
+                "uprns_with_duplicated_reviews": sfn.JsonPath.string_at(
+                    "$.ResultSet.Rows[1].Data[0].VarCharValue"
+                ),
+            },
+        )
+        # check results of query
+        check_merge_quality = (
+            sfn.Choice(self, "Check duplicated reviews query results")
+            .when(
+                sfn.Condition.string_equals(
+                    "$.uprns_with_duplicated_reviews", "0"
+                ),
+                sfn.Pass(self, "No UPRNs with duplicated reviews!"),
+            )
+            .otherwise(sfn.Fail(self, "Some uprns have duplicated reviews!"))
+        )
+        return (
+            merge_quality_check_query.next(get_merge_quality_check_results)
+            .next(remove_headers)
+            .next(check_merge_quality.afterwards())
         )
 
     def make_parallel_outcodes_task(self) -> sfn.Parallel:
