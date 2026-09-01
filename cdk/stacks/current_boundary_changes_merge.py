@@ -89,6 +89,8 @@ class CurrentBoundaryChangesMergeStack(DataBakerStack):
             target_table_name=current_boundary_reviews_joined_to_addressbase.table_name,
         )
 
+        merge_quality_check = self.make_merge_quality_check()
+
         delete_stale_outcodes = DeleteStaleOutcodesConstruct(
             self,
             "DeleteStaleOutcodes",
@@ -119,6 +121,7 @@ class CurrentBoundaryChangesMergeStack(DataBakerStack):
                 make_current_current_boundary_reviews_joined_to_addressbase_partitions_task
             )
             .next(first_letter_data_quality_checks.entry_point)
+            .next(merge_quality_check)
             .next(parallel_outcodes_task)
             .next(delete_stale_outcodes.entry_point)
             .next(outcode_addressbase_source_check.entry_point)
@@ -216,6 +219,69 @@ class CurrentBoundaryChangesMergeStack(DataBakerStack):
                     "blocking": True,
                 }
             ),
+        )
+
+    def make_merge_quality_check(self) -> sfn.Chain:
+        # query for uprns with duplicated reviews
+        merge_quality_check_query = tasks.LambdaInvoke(
+            self,
+            "Query for duplicated reviews",
+            lambda_function=self.athena_query_lambda,
+            payload=sfn.TaskInput.from_object(
+                {
+                    "context": current_boundary_reviews_joined_to_addressbase.populated_with.context.copy(),
+                    "QueryString": """
+                    WITH review_ids AS (
+                        SELECT
+                            t.uprn,
+                            json_extract_scalar(json_parse(u.review), '$.boundary_review_id') as review_id
+                        FROM current_boundary_reviews_parquet AS t
+                        CROSS JOIN UNNEST(t.boundary_reviews) AS u(review)
+                        WHERE cardinality(t.boundary_reviews) > 1
+                    )
+                    SELECT DISTINCT review_id
+                    FROM (
+                        SELECT uprn, review_id
+                        FROM review_ids
+                        GROUP BY uprn, review_id
+                        HAVING COUNT(*) > 1
+                    )
+                    """,
+                    "blocking": True,
+                }
+            ),
+        )
+        # get the results
+        get_merge_quality_check_results = tasks.AthenaGetQueryResults(
+            self,
+            "Get duplicated reviews query results",
+            query_execution_id="{% $states.input.Payload.queryExecutionId %}",
+            query_language=sfn.QueryLanguage.JSONATA,
+        )
+        # count the number of duplicated review rows (includes 1 header row)
+        get_row_count = sfn.Pass(
+            self,
+            "Count duplicated reviews query results",
+            parameters={
+                "duplicated_review_row_count": sfn.JsonPath.string_at(
+                    "States.ArrayLength($.ResultSet.Rows)"
+                ),
+            },
+        )
+
+        # check results of query
+        check_merge_quality = (
+            sfn.Choice(self, "Check duplicated reviews query results")
+            .when(
+                sfn.Condition.number_equals("$.duplicated_review_row_count", 1),
+                sfn.Pass(self, "No duplicated reviews!"),
+            )
+            .otherwise(sfn.Fail(self, "Some uprns have duplicated reviews!"))
+        )
+        return (
+            merge_quality_check_query.next(get_merge_quality_check_results)
+            .next(get_row_count)
+            .next(check_merge_quality.afterwards())
         )
 
     def make_parallel_outcodes_task(self) -> sfn.Parallel:
