@@ -10,7 +10,7 @@ runs:
         persist-credentials: false
 
     - name: Python setup
-      uses: ./.github/actions/python-setup
+      uses: $/.github/actions/python-setup
 
     - name: Node setup
-      uses: ./.github/actions/node-setup
+      uses: $/.github/actions/node-setup
