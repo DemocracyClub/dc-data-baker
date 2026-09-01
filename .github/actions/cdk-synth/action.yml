@@ -11,7 +11,7 @@ runs:
   steps:
 
     - name: Python setup
-      uses: ./.github/actions/install
+      uses: $/.github/actions/install
 
     - name: CDK Synth
       run: scripts/cdk-synth.sh --all
