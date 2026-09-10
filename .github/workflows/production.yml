@@ -16,10 +16,10 @@ jobs:
           persist-credentials: false
 
       - name: Install
-        uses: ./.github/actions/install
+        uses: $/.github/actions/install
 
       - name: Test
-        uses: ./.github/actions/test
+        uses: $/.github/actions/test
 
   stage-cdk-synth:
     name: CDK Synth (Staging)
@@ -33,7 +33,7 @@ jobs:
           persist-credentials: false
 
       - name: CDK Synth
-        uses: ./.github/actions/cdk-synth
+        uses: $/.github/actions/cdk-synth
         with:
           dc-environment: ${{ vars.DC_ENVIRONMENT }}
 
@@ -50,7 +50,7 @@ jobs:
           persist-credentials: false
 
       - name: CDK Synth
-        uses: ./.github/actions/cdk-synth
+        uses: $/.github/actions/cdk-synth
         with:
           dc-environment: ${{ vars.DC_ENVIRONMENT }}
 
@@ -69,7 +69,7 @@ jobs:
           persist-credentials: false
 
       - name: CDK Deploy
-        uses: ./.github/actions/cdk-deploy
+        uses: $/.github/actions/cdk-deploy
         with:
           dc-environment: ${{ vars.DC_ENVIRONMENT }}
           aws-role-arn: ${{ secrets.AWS_ROLE_ARN }}
@@ -89,7 +89,7 @@ jobs:
           persist-credentials: false
 
       - name: CDK Deploy
-        uses: ./.github/actions/cdk-deploy
+        uses: $/.github/actions/cdk-deploy
         with:
           dc-environment: ${{ vars.DC_ENVIRONMENT }}
           aws-role-arn: ${{ secrets.AWS_ROLE_ARN }}

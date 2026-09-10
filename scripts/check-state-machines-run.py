@@ -25,6 +25,7 @@ class CheckStateMachinesRun:
         self.current_boundary_changes_state_machine_arn = (
             self.get_current_boundary_changes_state_machine_arn()
         )
+
         self.sfn_client = boto3.client("stepfunctions")
 
     def handle(self):
@@ -47,7 +48,7 @@ class CheckStateMachinesRun:
 
     def get_current_boundary_changes_state_machine_arn(self):
         current_boundary_changes_outputs = self.cdk_output[
-            "CurrentBoundaryChangesStack"
+            "CurrentBoundaryChangesCoordinatorStack"
         ]
         return current_boundary_changes_outputs[
             "MakeCurrentBoundaryChangesParquetArnOutput"

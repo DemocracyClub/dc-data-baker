@@ -26,7 +26,8 @@ def export_sql():
             SELECT
                 obr.id AS boundary_review_id,
                 obr.slug,
-                obr.status,
+                obr.status AS scraped_status,
+                obr.public_visibility AS dc_stage,
                 obr.latest_event,
                 obr.consultation_url,
                 obr.legislation_title,
@@ -53,9 +54,16 @@ def export_sql():
             FROM
                 organisations_organisationboundaryreview obr
                 JOIN organisations_organisation o ON o.id = obr.organisation_id
-                JOIN organisations_organisationgeography og ON og.organisation_id = o.id
+                JOIN organisations_organisationgeography og ON (
+                    og.organisation_id = o.id
+                    AND COALESCE(o.start_date, og.start_date) < obr.effective_date
+                    AND (
+                        COALESCE(o.end_date, og.end_date) IS NULL
+                        OR obr.effective_date < COALESCE(o.end_date, og.end_date)
+                    )
+                )
             WHERE
-                obr.public_visibility != 'HIDDEN'
+                obr.public_visibility = 'MAP'
                 AND NOT EXISTS (
                     SELECT
                         e.election_id
@@ -74,7 +82,8 @@ def export_sql():
         )
     SELECT
         r.slug,
-        r.status,
+        r.scraped_status,
+        r.dc_stage,
         r.latest_event,
         r.consultation_url,
         r.legislation_title,
