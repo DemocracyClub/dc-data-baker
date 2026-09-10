@@ -54,7 +54,14 @@ def export_sql():
             FROM
                 organisations_organisationboundaryreview obr
                 JOIN organisations_organisation o ON o.id = obr.organisation_id
-                JOIN organisations_organisationgeography og ON og.organisation_id = o.id
+                JOIN organisations_organisationgeography og ON (
+                    og.organisation_id = o.id
+                    AND COALESCE(o.start_date, og.start_date) < obr.effective_date
+                    AND (
+                        COALESCE(o.end_date, og.end_date) IS NULL
+                        OR obr.effective_date < COALESCE(o.end_date, og.end_date)
+                    )
+                )
             WHERE
                 obr.public_visibility = 'MAP'
                 AND NOT EXISTS (

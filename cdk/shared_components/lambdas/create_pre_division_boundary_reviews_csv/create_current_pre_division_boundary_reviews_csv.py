@@ -22,7 +22,23 @@ ee_public_data_bucket = "ee.public.data"
 def export_sql():
     return """
     WITH
-        review AS (
+        reviews AS (
+            SELECT
+                obr.*,
+                COALESCE(obr.effective_date, CURRENT_DATE) AS comparison_date
+            FROM
+                organisations_organisationboundaryreview obr
+        ),
+        org_geographies AS (
+            SELECT
+                og.*,
+                COALESCE(og.start_date, o.start_date) AS active_from,
+                COALESCE(og.end_date, o.end_date) AS active_until
+            FROM
+                organisations_organisationgeography og
+                JOIN organisations_organisation o ON o.id = og.organisation_id
+        ),
+        review as (
             SELECT
                 obr.id AS boundary_review_id,
                 obr.slug,
@@ -40,9 +56,14 @@ def export_sql():
                 o.official_name AS organisation_official_name,
                 og.gss AS organisation_gss
             FROM
-                organisations_organisationboundaryreview obr
+                reviews obr
                 JOIN organisations_organisation o ON o.id = obr.organisation_id
-                JOIN organisations_organisationgeography og ON og.organisation_id = o.id
+                JOIN org_geographies og ON og.organisation_id = o.id
+                AND og.active_from < obr.comparison_date
+                AND (
+                    og.active_until IS NULL
+                    OR og.active_until > obr.comparison_date
+                )
             WHERE
                 obr.public_visibility = 'CONSULTATION'
                 AND NOT EXISTS (
