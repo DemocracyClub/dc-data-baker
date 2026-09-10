@@ -27,6 +27,9 @@ from shared_components.constructs.coordinated_singleton_state_machine_construct 
 from shared_components.constructs.make_partitions_construct import (
     MakePartitionsConstruct,
 )
+from shared_components.constructs.organisation_gss_check_construct import (
+    OrganisationGssCheckConstruct,
+)
 from shared_components.models import GlueTable, S3Bucket
 from shared_components.tables import (
     current_division_boundary_changes,
@@ -75,6 +78,15 @@ class CurrentBoundaryChangesPrecursorCSVsStack(DataBakerStack):
             self.make_partitions_task(current_pre_division_boundary_reviews)
         )
 
+        current_pre_division_boundary_reviews_quality_check = (
+            OrganisationGssCheckConstruct(
+                self,
+                "PreDivOrgGSSCheck",
+                athena_query_lambda=self.athena_query_lambda,
+                table_name=current_pre_division_boundary_reviews.table_name,
+            ).entry_point
+        )
+
         main_tasks = (
             delete_old_csvs_in_parallel.next(
                 create_current_division_boundary_changes_csv_task
@@ -83,6 +95,7 @@ class CurrentBoundaryChangesPrecursorCSVsStack(DataBakerStack):
             .next(current_division_boundary_changes_csv_quality_check)
             .next(create_current_pre_division_boundary_reviews_csv_task)
             .next(make_current_pre_division_boundary_reviews_partitions_task)
+            .next(current_pre_division_boundary_reviews_quality_check)
         )
 
         self.step_function = CoordinatedSingletonStateMachineConstruct(
@@ -189,7 +202,7 @@ class CurrentBoundaryChangesPrecursorCSVsStack(DataBakerStack):
 
     def make_current_division_boundary_changes_csv_quality_check(
         self,
-    ) -> sfn.Chain:
+    ) -> sfn.Parallel:
         division_ballots_query = tasks.LambdaInvoke(
             self,
             "Get divison ballots with more than one ballot",
@@ -245,12 +258,28 @@ class CurrentBoundaryChangesPrecursorCSVsStack(DataBakerStack):
             )
         )
 
-        return (
+        division_ballots_check = (
             division_ballots_query.next(get_division_ballots_query_result)
             .next(remove_headers)
             .next(count_results)
             .next(check_results_count.afterwards())
         )
+
+        organisation_gss_check = OrganisationGssCheckConstruct(
+            self,
+            "DivChangeOrgGSSCheck",
+            athena_query_lambda=self.athena_query_lambda,
+            table_name=current_division_boundary_changes.table_name,
+        )
+
+        quality_checks = sfn.Parallel(
+            self,
+            "Run current division boundary changes quality checks in parallel",
+        )
+        quality_checks.branch(division_ballots_check)
+        quality_checks.branch(organisation_gss_check.entry_point)
+
+        return quality_checks
 
     def make_current_pre_division_boundary_reviews_csv_task(
         self,
