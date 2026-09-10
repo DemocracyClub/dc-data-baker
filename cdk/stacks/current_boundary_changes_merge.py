@@ -231,10 +231,21 @@ class CurrentBoundaryChangesMergeStack(DataBakerStack):
                 {
                     "context": current_boundary_reviews_joined_to_addressbase.populated_with.context.copy(),
                     "QueryString": """
-                    SELECT
-                        COUNT(*) as uprns_with_duplicate_reviews
-                    FROM current_boundary_reviews_joined_to_addressbase
-                    WHERE cardinality(boundary_reviews)!= cardinality(array_distinct(boundary_reviews))
+                    WITH review_ids AS (
+                        SELECT
+                            t.uprn,
+                            json_extract_scalar(json_parse(u.review), '$.boundary_review_id') as review_id
+                        FROM current_boundary_reviews_parquet AS t
+                        CROSS JOIN UNNEST(t.boundary_reviews) AS u(review)
+                        WHERE cardinality(t.boundary_reviews) > 1
+                    )
+                    SELECT DISTINCT review_id
+                    FROM (
+                        SELECT uprn, review_id
+                        FROM review_ids
+                        GROUP BY uprn, review_id
+                        HAVING COUNT(*) > 1
+                    )
                     """,
                     "blocking": True,
                 }
@@ -247,30 +258,29 @@ class CurrentBoundaryChangesMergeStack(DataBakerStack):
             query_execution_id="{% $states.input.Payload.queryExecutionId %}",
             query_language=sfn.QueryLanguage.JSONATA,
         )
-        # drop the header row
-        remove_headers = sfn.Pass(
+        # count the number of duplicated review rows (includes 1 header row)
+        get_row_count = sfn.Pass(
             self,
-            "Drop header from duplicated reviews query results",
+            "Count duplicated reviews query results",
             parameters={
-                "uprns_with_duplicated_reviews": sfn.JsonPath.string_at(
-                    "$.ResultSet.Rows[1].Data[0].VarCharValue"
+                "duplicated_review_row_count": sfn.JsonPath.string_at(
+                    "States.ArrayLength($.ResultSet.Rows)"
                 ),
             },
         )
+
         # check results of query
         check_merge_quality = (
             sfn.Choice(self, "Check duplicated reviews query results")
             .when(
-                sfn.Condition.string_equals(
-                    "$.uprns_with_duplicated_reviews", "0"
-                ),
-                sfn.Pass(self, "No UPRNs with duplicated reviews!"),
+                sfn.Condition.number_equals("$.duplicated_review_row_count", 1),
+                sfn.Pass(self, "No duplicated reviews!"),
             )
             .otherwise(sfn.Fail(self, "Some uprns have duplicated reviews!"))
         )
         return (
             merge_quality_check_query.next(get_merge_quality_check_results)
-            .next(remove_headers)
+            .next(get_row_count)
             .next(check_merge_quality.afterwards())
         )
 
