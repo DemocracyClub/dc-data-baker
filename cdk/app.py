@@ -62,36 +62,41 @@ CurrentElectionsStack(
     env=env,
 )
 
-CurrentBoundaryChangesCoordinatorStack(
-    app,
-    "CurrentBoundaryChangesCoordinatorStack",
-    env=env,
-)
 
-CurrentBoundaryChangesPrecursorCSVsStack(
+current_bc_precursor_csv_stack = CurrentBoundaryChangesPrecursorCSVsStack(
     app,
     "CurrentBoundaryChangesPrecursorCSVsStack",
     env=env,
 )
 
-CurrentDivisionBoundaryChangesStack(
+current_div_bc_stack = CurrentDivisionBoundaryChangesStack(
     app,
     "CurrentDivisionBoundaryChangesStack",
     env=env,
 )
 
-CurrentPreDivisionBoundaryReviewsStack(
+current_pre_div_br_stack = CurrentPreDivisionBoundaryReviewsStack(
     app,
     "CurrentPreDivisionBoundaryReviewsStack",
     env=env,
 )
 
-CurrentBoundaryChangesMergeStack(
+current_bc_merge_stack = CurrentBoundaryChangesMergeStack(
     app,
     "CurrentBoundaryChangesMergeStack",
     env=env,
 )
 
+current_bc_coordinator_stack = CurrentBoundaryChangesCoordinatorStack(
+    app,
+    "CurrentBoundaryChangesCoordinatorStack",
+    env=env,
+)
+
+current_bc_coordinator_stack.add_dependency(current_bc_precursor_csv_stack)
+current_bc_coordinator_stack.add_dependency(current_div_bc_stack)
+current_bc_coordinator_stack.add_dependency(current_pre_div_br_stack)
+current_bc_coordinator_stack.add_dependency(current_bc_merge_stack)
 
 Tags.of(app).add("dc-product", "dc-data-baker")
 Tags.of(app).add("dc-environment", dc_environment)
