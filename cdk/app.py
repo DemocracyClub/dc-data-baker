@@ -4,8 +4,22 @@ import os
 
 from aws_cdk import App, Environment, Tags
 from stacks.addressbase import AddressBaseStack
-from stacks.current_boundary_changes import CurrentBoundaryChangesStack
+from stacks.current_boundary_changes_coordinator import (
+    CurrentBoundaryChangesCoordinatorStack,
+)
+from stacks.current_boundary_changes_merge import (
+    CurrentBoundaryChangesMergeStack,
+)
+from stacks.current_boundary_changes_precursor_csvs import (
+    CurrentBoundaryChangesPrecursorCSVsStack,
+)
+from stacks.current_division_boundary_changes import (
+    CurrentDivisionBoundaryChangesStack,
+)
 from stacks.current_elections import CurrentElectionsStack
+from stacks.current_pre_division_boundary_reviews import (
+    CurrentPreDivisionBoundaryReviewsStack,
+)
 from stacks.data_baker_core import DataBakerCoreStack
 
 valid_environments = (
@@ -48,9 +62,33 @@ CurrentElectionsStack(
     env=env,
 )
 
-CurrentBoundaryChangesStack(
+CurrentBoundaryChangesCoordinatorStack(
     app,
-    "CurrentBoundaryChangesStack",
+    "CurrentBoundaryChangesCoordinatorStack",
+    env=env,
+)
+
+CurrentBoundaryChangesPrecursorCSVsStack(
+    app,
+    "CurrentBoundaryChangesPrecursorCSVsStack",
+    env=env,
+)
+
+CurrentDivisionBoundaryChangesStack(
+    app,
+    "CurrentDivisionBoundaryChangesStack",
+    env=env,
+)
+
+CurrentPreDivisionBoundaryReviewsStack(
+    app,
+    "CurrentPreDivisionBoundaryReviewsStack",
+    env=env,
+)
+
+CurrentBoundaryChangesMergeStack(
+    app,
+    "CurrentBoundaryChangesMergeStack",
     env=env,
 )
 

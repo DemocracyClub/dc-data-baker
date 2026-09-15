@@ -13,7 +13,7 @@ runs:
   steps:
 
     - name: Python setup
-      uses: ./.github/actions/install
+      uses: $/.github/actions/install
 
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4

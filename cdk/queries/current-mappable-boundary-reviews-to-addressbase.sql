@@ -18,7 +18,7 @@ UNLOAD (
 			boundary_review_id,
             arbitrary(boundary_review_details) AS boundary_review_details,
             array_agg(boundary_change_details ORDER BY division_type) AS boundary_changes
-		FROM addresses_to_boundary_change
+		FROM addresses_to_division_boundary_change
 		GROUP BY uprn, boundary_review_id
 	),
 	aggregated_reviews AS (

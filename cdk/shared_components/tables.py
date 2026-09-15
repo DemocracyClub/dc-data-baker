@@ -91,16 +91,17 @@ current_ballots_joined_to_address_base = GlueTable(
 )
 
 
-current_boundary_changes = GlueTable(
-    table_name="current_boundary_changes",
+current_division_boundary_changes = GlueTable(
+    table_name="current_division_boundary_changes",
     description="A list of boundary changes with a WKT",
-    s3_prefix="{dc_environment}/current_boundary_reviews_with_wkt",
+    s3_prefix="{dc_environment}/current_mappable_boundary_reviews_with_wkt",
     bucket=data_baker_results_bucket,
     database=dc_data_baker,
     data_format=glue.DataFormat.CSV,
     columns={
         "slug": glue.Schema.STRING,
-        "status": glue.Schema.STRING,
+        "scraped_status": glue.Schema.STRING,
+        "dc_stage": glue.Schema.STRING,
         "latest_event": glue.Schema.STRING,
         "consultation_url": glue.Schema.STRING,
         "legislation_title": glue.Schema.STRING,
@@ -134,10 +135,10 @@ current_boundary_changes = GlueTable(
     ],
 )
 
-addresses_to_boundary_change = GlueTable(
-    table_name="addresses_to_boundary_change",
+addresses_to_division_boundary_change = GlueTable(
+    table_name="addresses_to_division_boundary_change",
     description="Address to single boundary change",
-    s3_prefix="addressbase/{dc_environment}/addresses_to_boundary_change/",
+    s3_prefix="addressbase/{dc_environment}/addresses_to_division_boundary_change/",
     bucket=pollingstations_private_data,
     database=dc_data_baker,
     data_format=glue.DataFormat.PARQUET,
@@ -160,7 +161,120 @@ addresses_to_boundary_change = GlueTable(
         ),
     },
     populated_with=BaseQuery(
-        name="addresses_to_boundary_change.sql",
+        name="addresses-to-division-boundary-change.sql",
+        context={},
+    ),
+)
+
+
+current_mappable_boundary_reviews_joined_to_addressbase = GlueTable(
+    table_name="current_mappable_boundary_reviews_joined_to_addressbase",
+    description="A list of current boundary changes per UPRN",
+    s3_prefix="addressbase/{dc_environment}/current_mappable_boundary_reviews_joined_to_addressbase/",
+    bucket=pollingstations_private_data,
+    database=dc_data_baker,
+    data_format=glue.DataFormat.PARQUET,
+    columns={
+        "uprn": glue.Schema.STRING,
+        "address": glue.Schema.STRING,
+        "postcode": glue.Schema.STRING,
+        "addressbase_source": glue.Schema.STRING,
+        "boundary_reviews": glue.Schema.array(
+            input_string="string", is_primitive=True
+        ),
+    },
+    partition_keys=[
+        glue.Column(
+            name="first_letter",
+            type=glue.Schema.STRING,
+        )
+    ],
+    populated_with=BaseQuery(
+        name="current-mappable-boundary-reviews-to-addressbase.sql",
+        context={},
+    ),
+)
+
+
+current_pre_division_boundary_reviews_joined_to_addressbase = GlueTable(
+    table_name="current_pre_division_boundary_reviews_joined_to_addressbase",
+    description="A list of current boundary changes per UPRN",
+    s3_prefix="addressbase/{dc_environment}/current_pre_division_boundary_reviews_joined_to_addressbase/",
+    bucket=pollingstations_private_data,
+    database=dc_data_baker,
+    data_format=glue.DataFormat.PARQUET,
+    columns={
+        "uprn": glue.Schema.STRING,
+        "address": glue.Schema.STRING,
+        "postcode": glue.Schema.STRING,
+        "addressbase_source": glue.Schema.STRING,
+        "boundary_reviews": glue.Schema.array(
+            input_string="string", is_primitive=True
+        ),
+    },
+    partition_keys=[
+        glue.Column(
+            name="first_letter",
+            type=glue.Schema.STRING,
+        )
+    ],
+    populated_with=BaseQuery(
+        name="current-pre-division-boundary-reviews-to-addressbase.sql",
+        context={},
+    ),
+)
+
+current_pre_division_boundary_reviews = GlueTable(
+    table_name="current_pre_division_boundary_reviews",
+    description="A list of pre-division boundary reviews with an org WKT",
+    s3_prefix="{dc_environment}/current_pre_division_boundary_reviews_with_wkt",
+    bucket=data_baker_results_bucket,
+    database=dc_data_baker,
+    data_format=glue.DataFormat.CSV,
+    columns={
+        "slug": glue.Schema.STRING,
+        "scraped_status": glue.Schema.STRING,
+        "dc_stage": glue.Schema.STRING,
+        "latest_event": glue.Schema.STRING,
+        "consultation_url": glue.Schema.STRING,
+        "legislation_title": glue.Schema.STRING,
+        "effective_date": glue.Schema.STRING,
+        "review_created": glue.Schema.STRING,
+        "review_modified": glue.Schema.STRING,
+        "organisation_name": glue.Schema.STRING,
+        "organisation_official_name": glue.Schema.STRING,
+        "organisation_gss": glue.Schema.STRING,
+        "organisation_boundary_wkt": glue.Schema.STRING,
+    },
+    partition_keys=[
+        glue.Column(
+            name="boundary_review_id",
+            type=glue.Schema.INTEGER,
+        ),
+    ],
+)
+
+addresses_to_pre_division_boundary_review = GlueTable(
+    table_name="addresses_to_pre_division_boundary_review",
+    description="Address to org with a boundary review",
+    s3_prefix="addressbase/{dc_environment}/addresses_to_pre_division_boundary_review/",
+    bucket=pollingstations_private_data,
+    database=dc_data_baker,
+    data_format=glue.DataFormat.PARQUET,
+    columns={
+        "uprn": glue.Schema.STRING,
+        "address": glue.Schema.STRING,
+        "postcode": glue.Schema.STRING,
+        "addressbase_source": glue.Schema.STRING,
+        "boundary_review_id": glue.Schema.INTEGER,
+        "boundary_review_details": glue.Schema.map(
+            glue.Schema.STRING,
+            input_string="string",
+            is_primitive=True,
+        ),
+    },
+    populated_with=BaseQuery(
+        name="addresses-to-pre-division-boundary-review.sql",
         context={},
     ),
 )
@@ -168,7 +282,7 @@ addresses_to_boundary_change = GlueTable(
 
 current_boundary_reviews_joined_to_addressbase = GlueTable(
     table_name="current_boundary_reviews_joined_to_addressbase",
-    description="A list of current boundary changes per UPRN",
+    description="A list of current boundary reviews per UPRN",
     s3_prefix="addressbase/{dc_environment}/current_boundary_reviews_joined_to_addressbase/",
     bucket=pollingstations_private_data,
     database=dc_data_baker,
@@ -189,14 +303,14 @@ current_boundary_reviews_joined_to_addressbase = GlueTable(
         )
     ],
     populated_with=BaseQuery(
-        name="current-boundary-reviews-to-addressbase.sql",
+        name="current-boundary-reviews-merge-query.sql",
         context={},
     ),
 )
 
 current_boundary_reviews_parquet = GlueTable(
     table_name="current_boundary_reviews_parquet",
-    description="The final product of the current boundary changes layer. A list of UPRNs with current boundary reviews grouped by outcode",
+    description="The final product of the current boundary changes coordination layer. A list of UPRNs with current boundary reviews grouped by outcode",
     s3_prefix="addressbase/{dc_environment}/current_boundary_reviews_parquet",
     bucket=pollingstations_private_data,
     database=dc_data_baker,
