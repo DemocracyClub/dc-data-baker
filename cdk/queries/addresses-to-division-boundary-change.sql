@@ -133,9 +133,8 @@ UNLOAD (
         addressbase_source,
         division_type,
         boundary_review_id,
-        MAP(
-            ARRAY['division_type', 'old_division_slug', 'old_division_name', 'old_division_official_identifier', 'old_divisionset_pmtiles_url', 'new_division_slug', 'new_division_name', 'new_division_official_identifier', 'new_divisionset_pmtiles_url', 'related_ballots', 'change_scenario'],
-            ARRAY[
+        CAST(
+            ROW(
                 division_type,
                 old_division_slug,
                 old_division_name,
@@ -145,14 +144,26 @@ UNLOAD (
                 new_division_name,
                 new_division_official_identifier,
                 new_divisionset_pmtiles_url,
-                related_ballots,
+                CAST(json_parse(related_ballots) AS ARRAY(VARCHAR)),
                 CASE
                     WHEN boundary_same AND name_same THEN 'NO_CHANGE'
                     WHEN boundary_same AND NOT name_same THEN 'NAME_CHANGED'
                     WHEN NOT boundary_same AND name_same THEN 'BOUNDARY_CHANGED'
                     ELSE 'BOTH_CHANGED'
                 END
-            ]
+            ) AS ROW(
+                division_type VARCHAR,
+                old_division_slug VARCHAR,
+                old_division_name VARCHAR,
+                old_division_official_identifier VARCHAR,
+                old_divisionset_pmtiles_url VARCHAR,
+                new_division_slug VARCHAR,
+                new_division_name VARCHAR,
+                new_division_official_identifier VARCHAR,
+                new_divisionset_pmtiles_url VARCHAR,
+                related_ballots ARRAY(VARCHAR),
+                change_scenario VARCHAR
+            )
         ) AS boundary_change_details,
         MAP(
             ARRAY['dc_stage', 'consultation_url', 'legislation_title', 'effective_date', 'organisation_name', 'organisation_official_name', 'organisation_gss'],
