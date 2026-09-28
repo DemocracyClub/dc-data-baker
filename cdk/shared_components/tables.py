@@ -149,10 +149,35 @@ addresses_to_division_boundary_change = GlueTable(
         "addressbase_source": glue.Schema.STRING,
         "division_type": glue.Schema.STRING,
         "boundary_review_id": glue.Schema.INTEGER,
-        "boundary_change_details": glue.Schema.map(
-            glue.Schema.STRING,
-            input_string="string",
-            is_primitive=True,
+        "boundary_change_details": glue.Schema.struct(
+            [
+                glue.Column(name="division_type", type=glue.Schema.STRING),
+                glue.Column(name="old_division_slug", type=glue.Schema.STRING),
+                glue.Column(name="old_division_name", type=glue.Schema.STRING),
+                glue.Column(
+                    name="old_division_official_identifier",
+                    type=glue.Schema.STRING,
+                ),
+                glue.Column(
+                    name="old_divisionset_pmtiles_url", type=glue.Schema.STRING
+                ),
+                glue.Column(name="new_division_slug", type=glue.Schema.STRING),
+                glue.Column(name="new_division_name", type=glue.Schema.STRING),
+                glue.Column(
+                    name="new_division_official_identifier",
+                    type=glue.Schema.STRING,
+                ),
+                glue.Column(
+                    name="new_divisionset_pmtiles_url", type=glue.Schema.STRING
+                ),
+                glue.Column(
+                    name="related_ballots",
+                    type=glue.Schema.array(
+                        input_string="string", is_primitive=True
+                    ),
+                ),
+                glue.Column(name="change_scenario", type=glue.Schema.STRING),
+            ]
         ),
         "boundary_review_details": glue.Schema.map(
             glue.Schema.STRING,
