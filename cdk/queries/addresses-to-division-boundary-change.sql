@@ -131,8 +131,6 @@ UNLOAD (
         address,
         postcode,
         addressbase_source,
-        division_type,
-        boundary_review_id,
         CAST(
             ROW(
                 division_type,
@@ -176,9 +174,12 @@ UNLOAD (
                 organisation_official_name,
                 organisation_gss
             ]
-        ) AS boundary_review_details
+        ) AS boundary_review_details,
+        boundary_review_id,
+        division_type
     FROM results
 ) TO '$table_full_s3_path' WITH (
     format = 'PARQUET',
-    compression = 'SNAPPY'
+    compression = 'SNAPPY',
+    partitioned_by = ARRAY['boundary_review_id', 'division_type']
 )

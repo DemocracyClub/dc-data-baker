@@ -147,8 +147,6 @@ addresses_to_division_boundary_change = GlueTable(
         "address": glue.Schema.STRING,
         "postcode": glue.Schema.STRING,
         "addressbase_source": glue.Schema.STRING,
-        "division_type": glue.Schema.STRING,
-        "boundary_review_id": glue.Schema.INTEGER,
         "boundary_change_details": glue.Schema.struct(
             [
                 glue.Column(name="division_type", type=glue.Schema.STRING),
@@ -189,6 +187,16 @@ addresses_to_division_boundary_change = GlueTable(
         name="addresses-to-division-boundary-change.sql",
         context={},
     ),
+    partition_keys=[
+        glue.Column(
+            name="boundary_review_id",
+            type=glue.Schema.INTEGER,
+        ),
+        glue.Column(
+            name="division_type",
+            type=glue.Schema.STRING,
+        ),
+    ],
 )
 
 
