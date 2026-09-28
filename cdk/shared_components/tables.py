@@ -299,7 +299,6 @@ addresses_to_pre_division_boundary_review = GlueTable(
         "address": glue.Schema.STRING,
         "postcode": glue.Schema.STRING,
         "addressbase_source": glue.Schema.STRING,
-        "boundary_review_id": glue.Schema.INTEGER,
         "boundary_review_details": glue.Schema.map(
             glue.Schema.STRING,
             input_string="string",
@@ -310,6 +309,12 @@ addresses_to_pre_division_boundary_review = GlueTable(
         name="addresses-to-pre-division-boundary-review.sql",
         context={},
     ),
+    partition_keys=[
+        glue.Column(
+            name="boundary_review_id",
+            type=glue.Schema.INTEGER,
+        )
+    ],
 )
 
 
