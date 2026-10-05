@@ -40,7 +40,6 @@ UNLOAD (
         address,
         postcode,
         addressbase_source,
-        boundary_review_id,
         MAP(
             ARRAY['dc_stage', 'consultation_url', 'legislation_title', 'effective_date', 'organisation_name', 'organisation_official_name', 'organisation_gss'],
             ARRAY[
@@ -52,9 +51,11 @@ UNLOAD (
                 organisation_official_name,
                 organisation_gss
             ]
-        ) AS boundary_review_details
+        ) AS boundary_review_details,
+        boundary_review_id
     FROM results
 ) TO '$table_full_s3_path' WITH (
     format = 'PARQUET',
-    compression = 'SNAPPY'
+    compression = 'SNAPPY',
+    partitioned_by = ARRAY['boundary_review_id']
 )

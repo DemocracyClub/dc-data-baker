@@ -68,6 +68,10 @@ class CurrentPreDivisionBoundaryReviewsStack(DataBakerStack):
 
         make_reviews_map = self.make_reviews_map()
 
+        make_addresses_to_pre_division_boundary_review_partitions = (
+            self.make_partitions_task(addresses_to_pre_division_boundary_review)
+        )
+
         delete_old_current_pre_division_boundary_reviews_joined_to_addressbase_task = self.make_delete_old_current_pre_division_boundary_reviews_joined_to_addressbase_task()
 
         make_current_pre_division_boundary_reviews_joined_to_addressbase_task = self.make_current_pre_division_boundary_reviews_joined_to_addressbase_task()
@@ -86,6 +90,9 @@ class CurrentPreDivisionBoundaryReviewsStack(DataBakerStack):
 
         main_tasks = (
             make_reviews_map.next(
+                make_addresses_to_pre_division_boundary_review_partitions
+            )
+            .next(
                 delete_old_current_pre_division_boundary_reviews_joined_to_addressbase_task
             )
             .next(
