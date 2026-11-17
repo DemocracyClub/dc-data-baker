@@ -20,6 +20,9 @@ from shared_components.buckets import (
 from shared_components.constructs.addressbase_data_quality_check_construct import (
     AddressbaseDataQualityCheckConstruct,
 )
+from shared_components.constructs.boundary_review_uprn_check_construct import (
+    BoundaryReviewUprnCheckConstruct,
+)
 from shared_components.constructs.coordinated_singleton_state_machine_construct import (
     CoordinatedSingletonStateMachineConstruct,
 )
@@ -72,6 +75,14 @@ class CurrentPreDivisionBoundaryReviewsStack(DataBakerStack):
             self.make_partitions_task(addresses_to_pre_division_boundary_review)
         )
 
+        check_reviews_have_addresses = BoundaryReviewUprnCheckConstruct(
+            self,
+            "BoundaryReviewUprnCheck",
+            athena_query_lambda=self.athena_query_lambda,
+            source_table_name=current_pre_division_boundary_reviews.table_name,
+            target_table_name=addresses_to_pre_division_boundary_review.table_name,
+        )
+
         delete_old_current_pre_division_boundary_reviews_joined_to_addressbase_task = self.make_delete_old_current_pre_division_boundary_reviews_joined_to_addressbase_task()
 
         make_current_pre_division_boundary_reviews_joined_to_addressbase_task = self.make_current_pre_division_boundary_reviews_joined_to_addressbase_task()
@@ -92,6 +103,7 @@ class CurrentPreDivisionBoundaryReviewsStack(DataBakerStack):
             make_reviews_map.next(
                 make_addresses_to_pre_division_boundary_review_partitions
             )
+            .next(check_reviews_have_addresses.entry_point)
             .next(
                 delete_old_current_pre_division_boundary_reviews_joined_to_addressbase_task
             )
