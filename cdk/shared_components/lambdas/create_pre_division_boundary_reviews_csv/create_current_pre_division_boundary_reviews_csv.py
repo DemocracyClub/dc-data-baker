@@ -54,6 +54,7 @@ def export_sql():
                 obr.organisation_id AS organisation_id,
                 o.slug as organisation_slug,
                 o.official_name AS organisation_official_name,
+                o.official_identifier AS organisation_official_identifier,
                 og.gss AS organisation_gss
             FROM
                 reviews obr
@@ -94,6 +95,7 @@ def export_sql():
         r.review_modified,
         r.organisation_name,
         r.organisation_official_name,
+        r.organisation_official_identifier,
         r.organisation_gss,
         st_astext (ogs.geography) AS organisation_boundary_wkt,
         r.boundary_review_id

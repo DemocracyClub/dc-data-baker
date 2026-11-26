@@ -17,6 +17,7 @@ UNLOAD (
                 effective_date,
                 organisation_name,
                 organisation_official_name,
+                organisation_official_identifier,
                 organisation_gss
             FROM current_division_boundary_changes
             WHERE
@@ -52,6 +53,7 @@ UNLOAD (
                 od.effective_date,
                 od.organisation_name,
                 od.organisation_official_name,
+                od.organisation_official_identifier,
                 od.organisation_gss
             FROM
                 addressbase_partitioned a JOIN old_divisionset od ON ST_WITHIN (
@@ -114,6 +116,7 @@ UNLOAD (
                 a.effective_date,
                 a.organisation_name,
                 a.organisation_official_name,
+                a.organisation_official_identifier,
                 a.organisation_gss,
                 a.related_ballots AS related_ballots,
                 bts.old_division_slug IS NOT NULL AS boundary_same,
@@ -164,7 +167,7 @@ UNLOAD (
             )
         ) AS boundary_change_details,
         MAP(
-            ARRAY['dc_stage', 'consultation_url', 'legislation_title', 'effective_date', 'organisation_name', 'organisation_official_name', 'organisation_gss'],
+            ARRAY['dc_stage', 'consultation_url', 'legislation_title', 'effective_date', 'organisation_name', 'organisation_official_name', 'organisation_official_identifier', 'organisation_gss'],
             ARRAY[
                 dc_stage,
                 consultation_url,
@@ -172,6 +175,7 @@ UNLOAD (
                 effective_date,
                 organisation_name,
                 organisation_official_name,
+                organisation_official_identifier,
                 organisation_gss
             ]
         ) AS boundary_review_details,
