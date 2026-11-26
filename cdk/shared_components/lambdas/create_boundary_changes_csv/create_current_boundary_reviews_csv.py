@@ -37,6 +37,7 @@ def export_sql():
                 o.common_name AS organisation_name,
                 o.slug as organisation_slug,
                 o.official_name AS organisation_official_name,
+                o.official_identifier AS organisation_official_identifier,
                 og.gss AS organisation_gss,
                 obr.divisionset_id AS new_divisionset_id,
                 (
@@ -92,6 +93,7 @@ def export_sql():
         r.review_modified,
         r.organisation_name,
         r.organisation_official_name,
+        r.organisation_official_identifier,
         r.organisation_gss,
         ds.id AS divisionset_id,
         concat('https://s3.eu-west-2.amazonaws.com/', '{ee_public_data_bucket}', '/pmtiles-store/', r.organisation_slug, '_', ds.id, '_', ds.pmtiles_md5_hash, '.pmtiles') AS divisionset_pmtiles_url,

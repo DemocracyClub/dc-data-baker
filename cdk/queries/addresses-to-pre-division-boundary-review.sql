@@ -8,6 +8,7 @@ UNLOAD (
                 effective_date,
                 organisation_name,
                 organisation_official_name,
+                organisation_official_identifier,
                 organisation_gss,
                 boundary_review_id,
                 organisation_boundary_wkt
@@ -28,6 +29,7 @@ UNLOAD (
                 r.effective_date,
                 r.organisation_name,
                 r.organisation_official_name,
+                r.organisation_official_identifier,
                 r.organisation_gss
             FROM
                 addressbase_partitioned a JOIN review r ON ST_WITHIN (
@@ -41,7 +43,7 @@ UNLOAD (
         postcode,
         addressbase_source,
         MAP(
-            ARRAY['dc_stage', 'consultation_url', 'legislation_title', 'effective_date', 'organisation_name', 'organisation_official_name', 'organisation_gss'],
+            ARRAY['dc_stage', 'consultation_url', 'legislation_title', 'effective_date', 'organisation_name', 'organisation_official_name', 'organisation_official_identifier', 'organisation_gss'],
             ARRAY[
                 dc_stage,
                 consultation_url,
@@ -49,6 +51,7 @@ UNLOAD (
                 effective_date,
                 organisation_name,
                 organisation_official_name,
+                organisation_official_identifier,
                 organisation_gss
             ]
         ) AS boundary_review_details,
